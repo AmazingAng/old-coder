@@ -99,8 +99,12 @@ re-runnable by the human, which a scratch-directory script is not.
 
 Persist one command that runs every layer in sequence and fails on the first
 broken one (e.g. `tools/gauntlet.sh`: tests+coverage → types → lint → mutation
-→ real execution). The "final fresh run" IS this command; EVIDENCE cites it,
-and the human can rerun the whole report with it. Pin dev-tool versions
+→ real execution). Start the script by deleting stale artifacts from previous
+runs (old coverage data, report files) so no layer can accidentally read a
+prior run's output — freshness by mechanism, not discipline. (Keep tool
+databases that accumulate value, e.g. hypothesis's example store.) The "final
+fresh run" IS this command; EVIDENCE cites it, and the human can rerun the
+whole report with it. Pin dev-tool versions
 (requirements-dev.txt, package.json devDependencies with exact versions, etc.)
 so the rerun uses the same gauntlet.
 

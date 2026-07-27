@@ -2,6 +2,7 @@
 # Gauntlet entry point: run every layer; fail on the first broken one.
 set -e
 cd "$(dirname "$0")/.."
+rm -f .coverage coverage.xml   # stale artifacts from previous runs
 PY=.venv/bin
 
 echo "=== tests + coverage ==="
