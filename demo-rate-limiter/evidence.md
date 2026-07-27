@@ -2,7 +2,7 @@
 
 - Spec approval: **not obtained (autonomous run)** — confidence claim is
   correspondingly reduced; `spec.md` is the artifact to review after the fact.
-- Source state: git commit `46417c8`; sha256 tree hash `d1388f71a8a8c6f3`
+- Source state: git commit `c721705`; sha256 tree hash `ec7daf3cefec6714`
   (over `src tests tools examples pyproject.toml requirements-dev.txt
   spec.md`, recompute with `find <those paths> -type f -not -path
   "*__pycache__*" | sort | xargs shasum -a 256 | shasum -a 256`).
@@ -39,12 +39,14 @@ Status legend: pass / fail / unverified / n-a.
 |---|---|---|
 | Tests | `pytest -q --cov=ratelimiter` | 17 passed, 0 failed |
 | Types | `mypy src tests examples tools` (strict) | 0 errors in 6 files |
-| Lint + format | `ruff check . && ruff format --check .` | 0 warnings, 8 files formatted |
+| Lint + format + complexity | `ruff check . && ruff format --check .` (includes mccabe complexity budget ≤ 8) | 0 warnings, 8 files formatted |
 | Changed-line coverage | `pytest --cov … --cov-report=term-missing` | 29/29 statements, 10/10 branches (100%; entire module is new, so changed lines = all lines) |
 | Mutation | `python tools/mutants.py` (manual, scripted; only pytest exit 1 counts as a kill — error exits are flagged, never counted) | 8/8 killed |
 | Property-based | hypothesis, 2 properties | 100 examples each, 0 falsified |
 | Real execution | `python examples/demo.py` (real `time.monotonic`) | burst of 5 → `[True, True, True, False, False]`; other key unaffected; allowed again after window |
-| Supply chain | `pip-audit -r requirements-dev.txt` | no known vulnerabilities; runtime dependencies: **none** (stdlib only), dev toolchain pinned |
+| Supply chain | `pip-audit -r requirements-dev.txt` | no known vulnerabilities; runtime dependencies: **none** (stdlib only), dev toolchain pinned & justified in spec setup plan |
+| Secret scan | pattern grep over demo sources (api key / secret / password / token / private key) | clean, no matches |
+| License check | — | n-a: zero runtime dependencies, nothing redistributed beyond this repo's own MIT code; dev tools are not shipped |
 | Suite health | pytest-randomly (order shuffled every run, e.g. seed 2606823942) | 17 passed in randomized order |
 
 ## Skipped layers
@@ -69,11 +71,13 @@ Status legend: pass / fail / unverified / n-a.
   `window_seconds=NaN` passed the original `<= 0` validation; the spec was
   revised visibly, a RED test watched failing, then the finiteness check
   implemented (killed as M7).
-- **Layer attribution** (historic, before M7/M8 existed): mutants vs the
-  property suite alone gave 3/5 killed — M2 (expiry boundary) and M6
-  (wrong-end pruning) survived. The headline kill score is carried by the
-  scenario tests; P1 is one-sided ("never exceeds limit") and cannot catch
-  fail-closed bugs. A lower-bound property remains a known improvement.
+- **Layer attribution** (fresh, 2026-07-27, all 8 mutants): mutants vs the
+  property suite alone give 3/8 killed (M1, M3, M5). Survivors and why:
+  M4/M7 (validation — properties never construct invalid limiters), M2
+  (exact boundary — stochastic inputs rarely hit it), M6/M8 (fail-closed
+  direction — P1 is one-sided, "never exceeds limit" cannot catch
+  under-allowing or hidden writes). The headline 8/8 is carried by the
+  scenario tests; a lower-bound property remains a known improvement.
 - **Flaky kill found on rerun** (2026-07-27): M2's kill turned out to depend
   on hypothesis randomly hitting the exact `age == window` boundary — a rerun
   reported it SURVIVED. Fixed properly: spec revision 2 added the boundary
@@ -83,5 +87,11 @@ Status legend: pass / fail / unverified / n-a.
 - **Git history note**: the demo originally ran without git (restores were
   verified by suite rerun + tree hash). The repo is now under git; source
   state above cites the commit.
-- Remaining known limits (out of spec scope): not thread-safe (no locking); a
-  NaN-returning *clock* fails closed but is not rejected.
+- **Spec revision 3 is a retrofit** (2026-07-27): the failure-model and
+  setup-plan sections were added after implementation to comply with the
+  current skill; the original setup was authorized conversationally, not via
+  spec approval. The failure-mode→layer mapping was reconstructed, not
+  design-driven — a fresh Tier 3 task would write it first.
+- Remaining known limits (out of spec scope): not thread-safe (no locking —
+  named in the failure model as the uncovered mode); a NaN-returning *clock*
+  fails closed but is not rejected.
