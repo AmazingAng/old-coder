@@ -2,7 +2,7 @@
 
 - Spec approval: **not obtained (autonomous run)** — confidence claim is
   correspondingly reduced; `spec.md` is the artifact to review after the fact.
-- Source state: git commit `348a4c5`; sha256 tree hash `b1e95cb28d04b8de`
+- Source state: git commit `46417c8`; sha256 tree hash `d1388f71a8a8c6f3`
   (over `src tests tools examples pyproject.toml requirements-dev.txt
   spec.md`, recompute with `find <those paths> -type f -not -path
   "*__pycache__*" | sort | xargs shasum -a 256 | shasum -a 256`).
@@ -44,6 +44,8 @@ Status legend: pass / fail / unverified / n-a.
 | Mutation | `python tools/mutants.py` (manual, scripted; only pytest exit 1 counts as a kill — error exits are flagged, never counted) | 8/8 killed |
 | Property-based | hypothesis, 2 properties | 100 examples each, 0 falsified |
 | Real execution | `python examples/demo.py` (real `time.monotonic`) | burst of 5 → `[True, True, True, False, False]`; other key unaffected; allowed again after window |
+| Supply chain | `pip-audit -r requirements-dev.txt` | no known vulnerabilities; runtime dependencies: **none** (stdlib only), dev toolchain pinned |
+| Suite health | pytest-randomly (order shuffled every run, e.g. seed 2606823942) | 17 passed in randomized order |
 
 ## Skipped layers
 
