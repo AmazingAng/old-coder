@@ -47,7 +47,10 @@ Makefile / CI config first). These are the defaults when nothing exists.
 | Mutation | cargo-mutants | `cargo mutants --file <changed file>` |
 | Property-based | proptest | `proptest!` macros |
 
-## Supply chain, secrets, and suite health (any ecosystem)
+## Extended layer menu (any ecosystem)
+
+Always-on layers live in SKILL.md's table; these are picked per task by the
+Tier 3 failure model (or when the domain plainly calls for them).
 
 | Layer | Tools | When |
 |---|---|---|
@@ -59,6 +62,9 @@ Makefile / CI config first). These are the defaults when nothing exists.
 | API compatibility | griffe (py) / api-extractor (ts) / apidiff (go) / cargo-semver-checks (rust) | when a public API is touched |
 | Concurrency | `go test -race` / ThreadSanitizer (C/C++/Rust) / loom (rust) / threading stress + rerun (py) | Tier 3, when the failure model names races |
 | Performance | pytest-benchmark / hyperfine / criterion | only when the spec states a budget |
+| UI checks | axe-core (accessibility) / Playwright screenshot diff (visual regression) / Lighthouse (perf & a11y budgets) | when the change touches user-facing UI — backend layers say nothing about a broken layout or an unreadable contrast |
+| Version matrix | tox / nox / CI matrix | when the project claims support for multiple language or platform versions — one version green is not evidence for the others |
+| Observability | assert critical paths emit logs/metrics (capture in tests or grep) | when the failure model includes "fails silently in production" — passing all tests but breaking invisibly is still a failure |
 
 New dependencies are a SPEC matter first, a tool matter second: each one needs
 a one-line justification in the setup plan, and EVIDENCE records the final

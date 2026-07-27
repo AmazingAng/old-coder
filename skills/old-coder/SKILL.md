@@ -182,7 +182,9 @@ Scale effort to blast radius, and say which tier you chose:
   growth, failed rollback…), and for each mode add a layer that can actually
   catch it — race/stress tests for concurrency, fuzzing for parsers, rollback
   rehearsal for migrations, benchmarks for latency budgets, API-compatibility
-  checks for public libraries, contract tests for service boundaries. Mutation and
+  checks for public libraries, contract tests for service boundaries,
+  logging/metric assertions where silent production failure is a mode
+  (full menu in `references/gauntlet.md`). Mutation and
   coverage cannot substitute for these; the generic gauntlet is the floor, not
   the ceiling. Then: full loop + property-based tests + mutation testing
   (tool-based if available) + adversarial pass — one explicit step trying to
