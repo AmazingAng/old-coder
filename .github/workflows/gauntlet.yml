@@ -1,0 +1,23 @@
+name: gauntlet
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gauntlet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pinned toolchain
+        working-directory: demo-rate-limiter
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r requirements-dev.txt -e .
+      - name: Run the gauntlet
+        working-directory: demo-rate-limiter
+        run: ./tools/gauntlet.sh

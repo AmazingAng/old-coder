@@ -51,6 +51,14 @@ Feature: Sliding-window rate limiting per key
     When constructing with window_seconds = NaN or +/-inf
     Then ValueError is raised naming window_seconds
 
+  Scenario: request at the exact window boundary is still limited
+    [REVISION 2026-07-27: mutant M2's kill turned out to depend on hypothesis
+    randomly hitting the exact boundary — no deterministic test covered it]
+    Given a limiter with limit 1 per 60 seconds
+    And an allowed request at t=0
+    When the key requests at exactly t=60
+    Then it returns False  # a hit expires only when its age EXCEEDS the window
+
   Scenario: non-monotonic clock does not grant extra quota
     Given a limiter with limit 1 per 60 seconds
     And an allowed request at t=100

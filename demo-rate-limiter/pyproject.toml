@@ -1,7 +1,7 @@
 [project]
 name = "ratelimiter"
 version = "0.1.0"
-description = "Sliding-window rate limiter (reliable-coding skill demo)"
+description = "Sliding-window rate limiter (old-coder skill demo)"
 requires-python = ">=3.12"
 
 [build-system]

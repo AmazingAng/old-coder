@@ -71,6 +71,13 @@ def test_non_finite_window_is_rejected(clock: FakeClock, window: float) -> None:
         RateLimiter(limit=1, window_seconds=window, clock=clock)
 
 
+def test_request_at_exact_window_boundary_is_still_limited(clock: FakeClock) -> None:
+    limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
+    assert limiter.allow("k") is True  # t=0
+    clock.now = 60.0
+    assert limiter.allow("k") is False  # age == window: still inside the window
+
+
 def test_must_not_denials_store_nothing(clock: FakeClock) -> None:
     limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
     assert limiter.allow("k") is True

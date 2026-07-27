@@ -63,6 +63,7 @@ def main() -> int:
     pytest_target = sys.argv[1] if len(sys.argv) > 1 else "tests"
     original = TARGET.read_text()
     killed = 0
+    errors = 0
     try:
         for name, old, new in MUTANTS:
             assert original.count(old) == 1, f"{name}: pattern not unique"
@@ -73,13 +74,25 @@ def main() -> int:
                 capture_output=True,
                 text=True,
             )
-            status = "KILLED" if result.returncode != 0 else "SURVIVED"
-            killed += status == "KILLED"
+            # Only exit code 1 (tests ran and at least one failed) is a kill.
+            # 0 = survived; anything else (collection error, usage error, no
+            # tests collected) means nothing was verified — never count it.
+            if result.returncode == 1:
+                status = "KILLED"
+                killed += 1
+            elif result.returncode == 0:
+                status = "SURVIVED"
+            else:
+                status = f"ERROR (pytest exit {result.returncode}, no tests verified)"
+                errors += 1
             print(f"{name}: {status}")
     finally:
         TARGET.write_text(original)
-    print(f"\n{killed}/{len(MUTANTS)} mutants killed")
-    return 0 if killed == len(MUTANTS) else 1
+    summary = f"\n{killed}/{len(MUTANTS)} mutants killed"
+    if errors:
+        summary += f", {errors} ERROR — run is invalid"
+    print(summary)
+    return 0 if killed == len(MUTANTS) and errors == 0 else 1
 
 
 if __name__ == "__main__":

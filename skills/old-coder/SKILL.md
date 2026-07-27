@@ -3,7 +3,7 @@ name: old-coder
 description: Evidence-first development — surround the implementation with an executable spec and a gauntlet of constraints (tests, types, coverage, mutation) so line-by-line review becomes optional. Use when the user explicitly asks for high-assurance or evidence-first work ("reliable", "TDD", "prove it works", "I won't read the code"), or when the change touches high-stakes domains (money, auth, data loss, concurrency, public API). For routine changes where the user just wants normal tests, write good tests directly instead of invoking this loop.
 ---
 
-# Reliable Coding: Constrain and Test
+# Old Coder: Reliable Coding Under Constraint and Test
 
 The human will NOT read your implementation. Their confidence comes entirely from
 two artifacts you produce: (1) an **executable specification** they approve before
