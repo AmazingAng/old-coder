@@ -2,10 +2,8 @@
 
 - Spec approval: **not obtained (autonomous run)** — confidence claim is
   correspondingly reduced; `spec.md` is the artifact to review after the fact.
-- Source state: git commit `c721705`; sha256 tree hash `ec7daf3cefec6714`
-  (over `src tests tools examples pyproject.toml requirements-dev.txt
-  spec.md`, recompute with `find <those paths> -type f -not -path
-  "*__pycache__*" | sort | xargs shasum -a 256 | shasum -a 256`).
+- Source state: git commit `7986797`; sha256 tree hash `5eef6873f0b281e6` —
+  reproduce both with `./tools/source_state.sh` (works from any directory).
 - Toolchain: pinned in `requirements-dev.txt` (local run: Python 3.14.3;
   CI runs the same gauntlet on 3.12 via `.github/workflows/gauntlet.yml`).
 - Entry point: `./tools/gauntlet.sh` reruns every layer below.
