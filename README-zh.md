@@ -11,7 +11,7 @@ skill 就是纯 markdown，任何能遵循指令的 coding agent 都能用：Cla
 ## 安装
 
 ```sh
-npx skills add https://github.com/amazingang/old-coder-skill
+npx skills add https://github.com/amazingang/old-coder
 ```
 
 也可以手动安装：

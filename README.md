@@ -11,7 +11,7 @@ It's plain markdown, so it works with any coding agent that follows instructions
 ## Installation
 
 ```sh
-npx skills add https://github.com/amazingang/old-coder-skill
+npx skills add https://github.com/amazingang/old-coder
 ```
 
 Or manually:
