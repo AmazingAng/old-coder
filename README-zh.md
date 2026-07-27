@@ -1,6 +1,8 @@
-# reliable-coding（中文说明）
+# old-coder（中文说明）
 
 > 本文是 [README.md](README.md) 的中文版。
+
+**一位老码农写给 agent 时代的策略：不读代码——让代码闯关。**
 
 一个让 coding agent **自证其码**的 skill。你不用逐行读 agent 写的代码——agent 必须让代码闯过一整套检查关卡，并且在写代码前交给你一份测试计划、写完后交给你一份证据报告。你审的是这两份文档，不是代码。
 
@@ -9,16 +11,16 @@ skill 就是纯 markdown，任何能遵循指令的 coding agent 都能用：Cla
 ## 安装
 
 ```sh
-npx skills add https://github.com/amazingang/reliable-coding-skill
+npx skills add https://github.com/amazingang/old-coder-skill
 ```
 
 也可以手动安装：
 
-- **Claude Code**——把 skill 拷进 skills 文件夹，然后用 `/reliable-coding` 调用，或在"证明它能用"这类请求时让它自动触发：
+- **Claude Code**——把 skill 拷进 skills 文件夹，然后用 `/old-coder` 调用，或在"证明它能用"这类请求时让它自动触发：
   ```sh
-  cp -r skills/reliable-coding ~/.claude/skills/    # 或 <project>/.claude/skills/
+  cp -r skills/old-coder ~/.claude/skills/    # 或 <project>/.claude/skills/
   ```
-- **其他 agent**——把 `skills/reliable-coding/SKILL.md` 加进你的 `AGENTS.md`、规则文件或 system prompt，并把 `references/gauntlet.md` 放在旁边备查。
+- **其他 agent**——把 `skills/old-coder/SKILL.md` 加进你的 `AGENTS.md`、规则文件或 system prompt，并把 `references/gauntlet.md` 放在旁边备查。
 
 ## 核心想法
 
@@ -69,7 +71,7 @@ agent 是在给自己的作业打分，所以规则很严：不许为通过而�
 ## 仓库里有什么
 
 ```
-skills/reliable-coding/   skill 本体（SKILL.md + references/gauntlet.md）
+skills/old-coder/         skill 本体（SKILL.md + references/gauntlet.md）
 demo-rate-limiter/        按此 skill 端到端做出来的限流器示例
 ```
 

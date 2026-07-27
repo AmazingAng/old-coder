@@ -1,5 +1,5 @@
 ---
-name: reliable-coding
+name: old-coder
 description: Evidence-first development — surround the implementation with an executable spec and a gauntlet of constraints (tests, types, coverage, mutation) so line-by-line review becomes optional. Use when the user explicitly asks for high-assurance or evidence-first work ("reliable", "TDD", "prove it works", "I won't read the code"), or when the change touches high-stakes domains (money, auth, data loss, concurrency, public API). For routine changes where the user just wants normal tests, write good tests directly instead of invoking this loop.
 ---
 

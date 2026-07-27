@@ -1,6 +1,8 @@
-# reliable-coding
+# old-coder
 
 *[中文说明 →](README-zh.md)*
+
+**An old coder's strategy for the agent era: don't read the code — make it run the gauntlet.**
 
 A skill that makes coding agents **prove their work**. Instead of you reading every line the agent writes, the agent must push its code through a gauntlet of checks — and hand you a test plan before coding and an evidence report after. You review those two documents, not the code.
 
@@ -9,16 +11,16 @@ It's plain markdown, so it works with any coding agent that follows instructions
 ## Installation
 
 ```sh
-npx skills add https://github.com/amazingang/reliable-coding-skill
+npx skills add https://github.com/amazingang/old-coder-skill
 ```
 
 Or manually:
 
-- **Claude Code** — copy the skill into a skills folder, then invoke `/reliable-coding` or let it trigger on "prove it works"-style requests:
+- **Claude Code** — copy the skill into a skills folder, then invoke `/old-coder` or let it trigger on "prove it works"-style requests:
   ```sh
-  cp -r skills/reliable-coding ~/.claude/skills/    # or <project>/.claude/skills/
+  cp -r skills/old-coder ~/.claude/skills/    # or <project>/.claude/skills/
   ```
-- **Other agents** — add `skills/reliable-coding/SKILL.md` to your `AGENTS.md`, rules file, or system prompt, and keep `references/gauntlet.md` alongside it.
+- **Other agents** — add `skills/old-coder/SKILL.md` to your `AGENTS.md`, rules file, or system prompt, and keep `references/gauntlet.md` alongside it.
 
 ## The idea
 
@@ -69,7 +71,7 @@ And one limit stated plainly: the gauntlet proves the code meets the spec — it
 ## What's in the repo
 
 ```
-skills/reliable-coding/   the skill (SKILL.md + references/gauntlet.md)
+skills/old-coder/         the skill (SKILL.md + references/gauntlet.md)
 demo-rate-limiter/        a rate limiter built end-to-end under the skill
 ```
 
