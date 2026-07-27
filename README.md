@@ -12,13 +12,19 @@ It's plain markdown, so it works with any coding agent that follows instructions
 npx skills add https://github.com/amazingang/reliable-coding-skill
 ```
 
-Or install manually — see [Quick start](#quick-start) below.
+Or manually:
+
+- **Claude Code** — copy the skill into a skills folder, then invoke `/reliable-coding` or let it trigger on "prove it works"-style requests:
+  ```sh
+  cp -r skills/reliable-coding ~/.claude/skills/    # or <project>/.claude/skills/
+  ```
+- **Other agents** — add `skills/reliable-coding/SKILL.md` to your `AGENTS.md`, rules file, or system prompt, and keep `references/gauntlet.md` alongside it.
 
 ## The idea
 
 From Uncle Bob (Robert C. Martin), on working with coding agents ([original tweet](https://x.com/unclebobmartin/status/2080257779395154409)):
 
-> My current strategy is to not read any of the code written by my agents. … What I do instead is to surround the agents with extreme constraints. … In the end, I have very high confidence in the code they produce because they've had to run the gauntlet of all of my constraints and tests.
+> My current strategy is to not read any of the code written by my agents. That’s the only way I can take advantage of their productivity. What I do instead is to surround the agents with extreme constraints. Unit tests, gherkin tests, QA procedures, quality metrics, mutation testing, test coverage, and a plethora of others. In the end, I have very high confidence in the code they produce because they’ve had to run the gauntlet of all of my constraints and tests.
 
 If you're not going to read the code, the things you *do* read have to carry the trust instead.
 
@@ -59,18 +65,6 @@ Effort scales with risk: a typo fix runs a couple of checks; anything touching m
 The agent grades its own homework, so the rules are strict: never weaken a test to make it pass; never report a check that didn't run; anything unverified is labeled `unverified`, never `pass`; if no human approved the spec, the report must say so and claim less confidence.
 
 And one limit stated plainly: the gauntlet proves the code meets the spec — it cannot prove the spec covers everything that matters. That's why the spec goes to you.
-
-## Quick start
-
-**Claude Code**
-
-```sh
-cp -r skills/reliable-coding ~/.claude/skills/    # or <project>/.claude/skills/
-```
-
-Then invoke `/reliable-coding`, or let it trigger on "prove it works"-style requests.
-
-**Other agents** — add `skills/reliable-coding/SKILL.md` to your `AGENTS.md`, rules file, or system prompt, and keep `references/gauntlet.md` alongside it.
 
 ## What's in the repo
 

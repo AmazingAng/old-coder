@@ -6,19 +6,25 @@
 
 skill 就是纯 markdown，任何能遵循指令的 coding agent 都能用：Claude Code、Codex CLI、Cursor、Aider，或你自己的 agent loop。
 
-## 安装（Installation）
+## 安装
 
 ```sh
 npx skills add https://github.com/amazingang/reliable-coding-skill
 ```
 
-也可以手动安装——见下文[快速开始](#快速开始)。
+也可以手动安装：
+
+- **Claude Code**——把 skill 拷进 skills 文件夹，然后用 `/reliable-coding` 调用，或在"证明它能用"这类请求时让它自动触发：
+  ```sh
+  cp -r skills/reliable-coding ~/.claude/skills/    # 或 <project>/.claude/skills/
+  ```
+- **其他 agent**——把 `skills/reliable-coding/SKILL.md` 加进你的 `AGENTS.md`、规则文件或 system prompt，并把 `references/gauntlet.md` 放在旁边备查。
 
 ## 核心想法
 
 来自 Uncle Bob（Robert C. Martin）谈与 coding agent 协作（[原推文](https://x.com/unclebobmartin/status/2080257779395154409)）：
 
-> 我目前的策略是完全不读 agent 写的任何代码。……我做的是用极端的约束把 agent 包围起来。……最终我对它们产出的代码有非常高的信心，因为这些代码闯过了我所有约束和测试组成的关卡。
+> 我目前的策略是完全不读 agent 写的任何代码。只有这样，我才能真正享受它们带来的生产力。我做的是用极端的约束把 agent 包围起来：单元测试、gherkin 测试、QA 流程、质量指标、mutation testing、测试覆盖率，以及其他一大堆手段。最终我对它们产出的代码有非常高的信心，因为这些代码闯过了我所有约束和测试组成的关卡（gauntlet）。
 
 既然你不打算读代码，那你**确实要读**的东西就必须能承载这份信任。
 
@@ -59,18 +65,6 @@ flowchart LR
 agent 是在给自己的作业打分，所以规则很严：不许为通过而弱化测试；不许报告没跑过的检查；没验证的条目只能标 `unverified`，不许标 `pass`；如果没有人批准过 spec，报告必须如实写明，并降低置信声明。
 
 还有一条明说的边界：关卡能证明代码符合 spec——但无法证明 spec 覆盖了所有重要的事。所以 spec 才要交给你。
-
-## 快速开始
-
-**Claude Code**
-
-```sh
-cp -r skills/reliable-coding ~/.claude/skills/    # 或 <project>/.claude/skills/
-```
-
-然后用 `/reliable-coding` 调用，或在"证明它能用"这类请求时让它自动触发。
-
-**其他 agent**——把 `skills/reliable-coding/SKILL.md` 加进你的 `AGENTS.md`、规则文件或 system prompt，并把 `references/gauntlet.md` 放在旁边备查。
 
 ## 仓库里有什么
 
