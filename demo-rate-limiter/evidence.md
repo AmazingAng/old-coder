@@ -2,15 +2,16 @@
 
 - Spec approval: **not obtained (autonomous run)** — confidence claim is
   correspondingly reduced; `spec.md` is the artifact to review after the fact.
-- Source state: no git — sha256 tree hash `3cdb651a0e1cf8bc` (over `src tests
-  tools examples pyproject.toml requirements-dev.txt spec.md`, recompute with
-  `find <those paths> -type f -not -path "*__pycache__*" | sort | xargs
-  shasum -a 256 | shasum -a 256`).
-- Toolchain: pinned in `requirements-dev.txt` (Python 3.14.3).
+- Source state: git commit `348a4c5`; sha256 tree hash `b1e95cb28d04b8de`
+  (over `src tests tools examples pyproject.toml requirements-dev.txt
+  spec.md`, recompute with `find <those paths> -type f -not -path
+  "*__pycache__*" | sort | xargs shasum -a 256 | shasum -a 256`).
+- Toolchain: pinned in `requirements-dev.txt` (local run: Python 3.14.3;
+  CI runs the same gauntlet on 3.12 via `.github/workflows/gauntlet.yml`).
 - Entry point: `./tools/gauntlet.sh` reruns every layer below.
 
 All numbers are from one final fresh run of the entry point, executed
-2026-07-26 after the last code edit.
+2026-07-27 after the last code edit.
 
 ## Spec → Test mapping
 
@@ -26,6 +27,7 @@ Status legend: pass / fail / unverified / n-a.
 | invalid construction is rejected | test_ratelimiter.py::test_invalid_construction_is_rejected (4 params) | pass |
 | non-finite window is rejected (spec revision) | test_ratelimiter.py::test_non_finite_window_is_rejected (3 params) | pass |
 | non-monotonic clock does not grant extra quota | test_ratelimiter.py::test_non_monotonic_clock_does_not_grant_extra_quota | pass |
+| request at the exact window boundary is still limited (spec revision 2) | test_ratelimiter.py::test_request_at_exact_window_boundary_is_still_limited + mutant M2 | pass |
 | Invariant P1 (window count ≤ limit) | test_properties.py::test_p1_allowed_count_within_any_window_never_exceeds_limit | pass |
 | Invariant P2 (key independence) | test_properties.py::test_p2_other_keys_traffic_never_changes_one_keys_outcomes | pass |
 | Must NOT: denials store nothing (no memory growth) | test_ratelimiter.py::test_must_not_denials_store_nothing + mutant M8 | pass |
@@ -35,11 +37,11 @@ Status legend: pass / fail / unverified / n-a.
 
 | Layer | Command | Result |
 |---|---|---|
-| Tests | `pytest -q --cov=ratelimiter` | 16 passed, 0 failed |
+| Tests | `pytest -q --cov=ratelimiter` | 17 passed, 0 failed |
 | Types | `mypy src tests examples tools` (strict) | 0 errors in 6 files |
 | Lint + format | `ruff check . && ruff format --check .` | 0 warnings, 8 files formatted |
 | Changed-line coverage | `pytest --cov … --cov-report=term-missing` | 29/29 statements, 10/10 branches (100%; entire module is new, so changed lines = all lines) |
-| Mutation | `python tools/mutants.py` (manual, scripted) | 8/8 killed |
+| Mutation | `python tools/mutants.py` (manual, scripted; only pytest exit 1 counts as a kill — error exits are flagged, never counted) | 8/8 killed |
 | Property-based | hypothesis, 2 properties | 100 examples each, 0 falsified |
 | Real execution | `python examples/demo.py` (real `time.monotonic`) | burst of 5 → `[True, True, True, False, False]`; other key unaffected; allowed again after window |
 
@@ -70,8 +72,14 @@ Status legend: pass / fail / unverified / n-a.
   (wrong-end pruning) survived. The headline kill score is carried by the
   scenario tests; P1 is one-sided ("never exceeds limit") and cannot catch
   fail-closed bugs. A lower-bound property remains a known improvement.
-- **No git**: mutant restores are verified by rerunning the suite and by the
-  tree hash above — a weaker guarantee than `git diff`, recorded per the
-  skill's Setup rule.
+- **Flaky kill found on rerun** (2026-07-27): M2's kill turned out to depend
+  on hypothesis randomly hitting the exact `age == window` boundary — a rerun
+  reported it SURVIVED. Fixed properly: spec revision 2 added the boundary
+  behavior, a deterministic test was written and proven non-vacuous against
+  M2 alone. Property-based kills are stochastic; deterministic behaviors
+  deserve deterministic tests.
+- **Git history note**: the demo originally ran without git (restores were
+  verified by suite rerun + tree hash). The repo is now under git; source
+  state above cites the commit.
 - Remaining known limits (out of spec scope): not thread-safe (no locking); a
   NaN-returning *clock* fails closed but is not rejected.
