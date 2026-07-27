@@ -1,0 +1,31 @@
+[project]
+name = "ratelimiter"
+version = "0.1.0"
+description = "Sliding-window rate limiter (reliable-coding skill demo)"
+requires-python = ">=3.12"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+strict = true
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "SIM", "C90"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 8
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
