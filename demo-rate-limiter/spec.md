@@ -77,3 +77,36 @@ Feature: Sliding-window rate limiting per key
 
 - No real time.sleep / wall-clock dependence in tests.
 - No unbounded memory growth from denied requests (denials store nothing).
+
+## Failure model (Tier 3)
+
+[REVISION 3, 2026-07-27: retrofitted — the skill now requires an explicit
+failure model before layer selection; these modes were previously implicit
+in the scenarios, Must NOTs, and adversarial pass.]
+
+| How this can hurt | Layer that catches it |
+|---|---|
+| over-allowing in a burst (limit not enforced) | scenario tests + P1 + mutants M1/M5 |
+| under-allowing / fail-closed drift (quota lost) | boundary scenario + mutants M6/M8 (P1 is one-sided and cannot catch this) |
+| hostile or invalid config silently accepted | validation scenarios + adversarial pass + mutants M4/M7 |
+| clock skew opening the gate | non-monotonic clock scenario |
+| memory growth from denials | Must NOT test + mutant M8 |
+| concurrent callers racing on shared state | **not covered — known limit**; single-threaded use only |
+| silent failure in production | n-a: library returns a bool the caller observes directly |
+
+## Setup plan
+
+[REVISION 3, 2026-07-27: retrofitted — the skill now requires dependencies
+to be justified in the spec. Original setup was authorized conversationally.]
+
+- Runtime dependencies: **none** — stdlib (`collections.deque`, `math`) suffices.
+- Dev toolchain (pinned in `requirements-dev.txt`, never shipped):
+  - pytest + pytest-cov + coverage — test runner and changed-line coverage
+  - mypy — strict type checking
+  - ruff — lint, format, and complexity budget (mccabe ≤ 8)
+  - hypothesis — property-based invariants P1/P2
+  - pip-audit — vulnerability audit of the pinned toolchain
+  - pytest-randomly — randomized test order (suite-health layer)
+- Git: repo-level; commits at each milestone; evidence binds to commit SHA.
+- Files the gauntlet adds: `tools/gauntlet.sh` (entry point), `tools/mutants.py`
+  (scripted manual mutation), `.github/workflows/gauntlet.yml` (CI).
