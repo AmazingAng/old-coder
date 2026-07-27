@@ -1,8 +1,4 @@
-<p align="center">
-  <img src="assets/old-coder-github-banner-zh.png" alt="old-coder：SPEC → 关卡 → 证据">
-</p>
-
-# old-coder（老码农）
+# old-coder skill（老码农 skill）
 
 > 本文是 [README.md](README.md) 的中文版。
 
@@ -26,6 +22,8 @@ npx skills add https://github.com/amazingang/old-coder
   ```
 - **其他 agent**——把 `skills/old-coder/SKILL.md` 加进你的 `AGENTS.md`、规则文件或 system prompt，并把 `references/gauntlet.md` 放在旁边备查。
 
+
+
 ## 核心想法
 
 本项目启发于 Uncle Bob（Robert C. Martin）关于 coding agent 协作的观点（[原推文](https://x.com/unclebobmartin/status/2080257779395154409)）：
@@ -48,6 +46,8 @@ flowchart LR
     REF -. 下一个行为 .-> RED
 ```
 
+
+
 你只需要读两份文档：
 
 - **SPEC**（写代码之前）——代码必须做什么、必须不做什么的具体例子，外加 agent 想装哪些工具。批准它，是你唯一要做的决定。
@@ -55,14 +55,17 @@ flowchart LR
 
 中间的“关卡”：
 
-| 检查 | 它回答的问题 |
-|---|---|
-| 全量测试 | 有没有东西被改坏？ |
-| 类型检查 + lint | 有没有低级错误？ |
-| 改动行覆盖率 | 每一行新代码都真的被测试跑到了吗？ |
-| Mutation testing | 故意埋 bug——测试能抓到吗？ |
-| Property-based 测试 | 几百个随机输入下规则还成立吗？ |
-| 真实执行 | 离开测试环境，它真的能跑吗？ |
+
+| 检查                | 它回答的问题            |
+| ----------------- | ----------------- |
+| 全量测试              | 有没有东西被改坏？         |
+| 类型检查 + lint       | 有没有低级错误？          |
+| 改动行覆盖率            | 每一行新代码都真的被测试跑到了吗？ |
+| Mutation testing  | 故意埋 bug——测试能抓到吗？  |
+| Property-based 测试 | 几百个随机输入下规则还成立吗？   |
+| 真实执行              | 离开测试环境，它真的能跑吗？    |
+| 供应链              | agent 有没有偷偷引入危险或不必要的包？ |
+
 
 投入随风险分级：改个错别字只跑一两项检查；涉及金钱、登录、数据、并发的改动全部都跑——agent 还要先用恶意输入攻击自己的代码。
 
@@ -86,6 +89,8 @@ cd demo-rate-limiter
 python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt -e .
 ./tools/gauntlet.sh
 ```
+
+
 
 ## 许可证
 

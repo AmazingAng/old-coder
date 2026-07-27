@@ -43,8 +43,11 @@ implementation files:
   line — never silently absent from the mapping.
 - The spec doubles as the authorization point: include the **setup plan** —
   tools to install, git usage (init? checkpoint commit cadence?), files the
-  gauntlet will add — so approving the spec authorizes the environment changes
-  in one step instead of N interruptions.
+  gauntlet will add, and **every new dependency with a one-line justification**
+  (prefer the standard library and deps already present; an unjustified
+  package is a spec defect) — so approving the spec authorizes the environment
+  changes in one step instead of N interruptions, and the human can veto a
+  risky package before it is ever installed.
 - Show the spec to the human in plain language and get approval **before writing
   implementation**. In autonomous mode, state the spec in your response and
   proceed — but the correlation-breaking review never happened, so EVIDENCE
@@ -99,6 +102,8 @@ or a tool is unavailable, record that in the evidence report with the reason.
 | Property-based tests | edge cases you didn't imagine | for parsing, math, serialization, anything with invariants (round-trip, idempotence, ordering) — add hypothesis/fast-check properties |
 | Complexity budget | unmaintainable output | new functions small and single-purpose; if a function needs a paragraph to explain, split it |
 | Real execution | "passes tests, doesn't run" | actually run the app/CLI/endpoint once on a realistic input, not only the test harness |
+| Supply chain & secrets | vulnerable/unnecessary deps, leaked credentials | when the dependency set changed: audit it (pip-audit / npm audit / govulncheck / cargo-audit) and check licenses; scan the diff for secrets; every new dependency must trace back to its SPEC justification. Also eyeball the capability diff: did the change start using network / subprocess / filesystem / env it didn't before? |
+| Suite health | flaky or order-dependent tests | run the suite in randomized order (pytest-randomly etc.); repeat suspected flakes. Every EVIDENCE number rests on the suite being deterministic — a flaky suite quietly invalidates the report |
 
 Baseline note — on a repo with pre-existing failures, record the baseline
 first (which tests already fail, verbatim) and hold the line at zero NEW
@@ -176,7 +181,8 @@ Scale effort to blast radius, and say which tier you chose:
   hurt (race condition, partial write, hostile input, overflow, unbounded
   growth, failed rollback…), and for each mode add a layer that can actually
   catch it — race/stress tests for concurrency, fuzzing for parsers, rollback
-  rehearsal for migrations, benchmarks for latency budgets. Mutation and
+  rehearsal for migrations, benchmarks for latency budgets, API-compatibility
+  checks for public libraries, contract tests for service boundaries. Mutation and
   coverage cannot substitute for these; the generic gauntlet is the floor, not
   the ceiling. Then: full loop + property-based tests + mutation testing
   (tool-based if available) + adversarial pass — one explicit step trying to

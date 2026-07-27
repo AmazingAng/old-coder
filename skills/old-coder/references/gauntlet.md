@@ -47,6 +47,23 @@ Makefile / CI config first). These are the defaults when nothing exists.
 | Mutation | cargo-mutants | `cargo mutants --file <changed file>` |
 | Property-based | proptest | `proptest!` macros |
 
+## Supply chain, secrets, and suite health (any ecosystem)
+
+| Layer | Tools | When |
+|---|---|---|
+| Dependency audit | pip-audit / npm audit / govulncheck / cargo-audit | whenever the dependency set changed |
+| License check | pip-licenses / license-checker / go-licenses / cargo-license | when adding deps to redistributable code |
+| Secret scan | gitleaks (language-agnostic) | on the diff before committing |
+| Capability diff | manual diff review, or semgrep rules | always cheap: did the change start using network / subprocess / filesystem / env vars it didn't before? An agent-added capability nobody asked for is a red flag |
+| Suite health | pytest-randomly (py) / `vitest --sequence.shuffle` (ts) / `go test -shuffle=on` / `cargo test -- --shuffle` (nightly) | randomized order per run; repeat suspected flakes |
+| API compatibility | griffe (py) / api-extractor (ts) / apidiff (go) / cargo-semver-checks (rust) | when a public API is touched |
+| Concurrency | `go test -race` / ThreadSanitizer (C/C++/Rust) / loom (rust) / threading stress + rerun (py) | Tier 3, when the failure model names races |
+| Performance | pytest-benchmark / hyperfine / criterion | only when the spec states a budget |
+
+New dependencies are a SPEC matter first, a tool matter second: each one needs
+a one-line justification in the setup plan, and EVIDENCE records the final
+dependency diff so the human can see exactly what the agent pulled in.
+
 ## Manual mutation procedure (any language, no tool)
 
 Script this rather than hand-editing, and **persist the script in the repo**
@@ -129,6 +146,8 @@ Status is one of: **pass / fail / unverified / n-a**. A row mapped to
 | Mutation | <tool or "manual"> | <killed>/<total> killed |
 | Property-based | <cmd> | <N> properties, <examples/property> examples each |
 | Real execution | <cmd> | <observed output> |
+| Supply chain | <cmd> | 0 known vulns; new deps: none (or list, each ↔ SPEC justification) |
+| Suite health | <cmd> | randomized order (seed <n>), all passed |
 
 ### Skipped layers
 - <layer>: <reason>  (or "none")

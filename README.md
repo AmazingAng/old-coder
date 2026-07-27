@@ -2,7 +2,7 @@
   <img src="assets/old-coder-github-banner.png" alt="old-coder: SPEC → GAUNTLET → EVIDENCE">
 </p>
 
-# old-coder
+# Old Coder skill（老码农 skill）
 
 *[中文说明 →](README-zh.md)*
 
@@ -63,6 +63,7 @@ The gauntlet in between:
 | Mutation testing | Plant bugs on purpose — do the tests catch them? |
 | Property-based tests | Do the rules survive hundreds of random inputs? |
 | Real execution | Does it actually run, outside the test harness? |
+| Supply chain | Did the agent quietly pull in risky or unnecessary packages? |
 
 Effort scales with risk: a typo fix runs a couple of checks; anything touching money, logins, data, or concurrency runs everything — plus the agent attacks its own code with hostile inputs first.
 

@@ -4,3 +4,5 @@ coverage==7.15.2
 hypothesis==6.161.2
 mypy==2.3.0
 ruff==0.16.0
+pip-audit==2.10.1
+pytest-randomly==4.1.0

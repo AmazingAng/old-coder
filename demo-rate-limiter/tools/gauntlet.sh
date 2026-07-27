@@ -11,6 +11,8 @@ echo "=== types ==="
 echo "=== lint + format ==="
 "$PY/ruff" check .
 "$PY/ruff" format --check .
+echo "=== supply chain ==="
+"$PY/pip-audit" -r requirements-dev.txt
 echo "=== mutation ==="
 "$PY/python" tools/mutants.py
 echo "=== real execution ==="
