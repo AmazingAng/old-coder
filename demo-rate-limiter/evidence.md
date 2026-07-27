@@ -2,7 +2,7 @@
 
 - Spec approval: **not obtained (autonomous run)** — confidence claim is
   correspondingly reduced; `spec.md` is the artifact to review after the fact.
-- Source state: git commit `7986797`; sha256 tree hash `5eef6873f0b281e6` —
+- Source state: git commit `9b63d4c`; sha256 tree hash `941518c42589438d` —
   reproduce both with `./tools/source_state.sh` (works from any directory).
 - Toolchain: pinned in `requirements-dev.txt` (local run: Python 3.14.3;
   CI runs the same gauntlet on 3.12 via `.github/workflows/gauntlet.yml`).
