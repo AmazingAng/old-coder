@@ -78,13 +78,22 @@ nothing. Details that matter in practice:
 Write the least code that makes the failing test pass. Run the full suite, not
 just the new test.
 
-### 4. REFACTOR — clean up under green, tests untouched
+### 4. REFACTOR — clean up under green, assertions frozen
 
 Minimal code is often ugly code. While the suite is green, improve names,
-extract duplication, and simplify structure — **without touching any test
-file**. Run the suite after each refactor. Tests are the spec's fingerprint;
-refactoring that requires editing tests isn't refactoring, it's a behavior
-change and belongs back in SPEC. Repeat RED→GREEN→REFACTOR per behavior.
+extract duplication, and simplify structure. What is frozen is **behavioral
+assertions**, not test files wholesale:
+
+- Implementation refactors touch no test files at all.
+- Test-structure refactors (extracting helpers and fixtures, deduplicating
+  setup) are allowed as a **separate step**: assertions unchanged, suite green
+  before and after, then rerun mutation to confirm the restructured tests
+  still kill — a refactor that blunts the tests is a silent hole in the
+  gauntlet.
+- Anything that requires editing an assertion isn't refactoring, it's a
+  behavior change and belongs back in SPEC.
+
+Run the suite after each refactor. Repeat RED→GREEN→REFACTOR per behavior.
 
 ### 5. GAUNTLET — the constraint stack
 

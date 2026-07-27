@@ -11,7 +11,7 @@ Makefile / CI config first). These are the defaults when nothing exists.
 | Types | mypy | `mypy <pkg>` (or pyright) |
 | Lint + format | ruff | `ruff check . && ruff format --check .` |
 | Changed-line coverage | coverage.py | `pytest --cov=<pkg> --cov-branch --cov-report=term-missing` then verify the lines you touched appear covered; `diff-cover coverage.xml` automates changed-line % against git |
-| Mutation | mutmut | `mutmut run --paths-to-mutate <changed files>`; survivors = weak tests |
+| Mutation | mutmut (3+) | configure `[tool.mutmut] source_paths = ["src/"]` in pyproject.toml, then `mutmut run` (target one module with `mutmut run "my_module*"`); survivors = weak tests |
 | Property-based | hypothesis | `@given(...)` strategies for invariants |
 
 ## JavaScript / TypeScript
@@ -129,7 +129,9 @@ scenario so the evidence report's spec→test mapping is mechanical.
 
 - Spec approval: <obtained from user | not obtained (autonomous run) —
   confidence downgraded; spec is the artifact to review after the fact>
-- Source state: <commit SHA | no git: sha256 tree hash of source files>
+- Source state: <commit SHA | no git: sha256 tree hash> — persist the
+  computation as a script (e.g. tools/source_state.sh); a hash recipe written
+  in prose is working-directory-sensitive and will fail to reproduce
 - Toolchain: <pinned versions file, e.g. requirements-dev.txt>
 - Entry point: <single command that reruns every layer>
 
