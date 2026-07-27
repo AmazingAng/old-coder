@@ -58,12 +58,15 @@ The gauntlet in between:
 | Check | The question it answers |
 |---|---|
 | Full test suite | Did anything break? |
-| Types + lint | Any obvious mistakes? |
+| Types + lint + complexity | Any obvious mistakes? Any unreadable tangles? |
 | Changed-line coverage | Is every new line actually exercised by a test? |
 | Mutation testing | Plant bugs on purpose — do the tests catch them? |
 | Property-based tests | Do the rules survive hundreds of random inputs? |
 | Real execution | Does it actually run, outside the test harness? |
-| Supply chain | Did the agent quietly pull in risky or unnecessary packages? |
+| Supply chain & secrets | Did the agent quietly pull in risky packages, or leak a key? |
+| Suite health | Are the tests themselves stable, in any order? |
+
+Plus a menu of domain-specific layers — concurrency, UI checks, API compatibility, performance, observability — picked per task from a risk model (see `references/gauntlet.md`).
 
 Effort scales with risk: a typo fix runs a couple of checks; anything touching money, logins, data, or concurrency runs everything — plus the agent attacks its own code with hostile inputs first.
 
