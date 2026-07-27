@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/old-coder-github-banner-zh.png" alt="old-coder：SPEC → 关卡 → 证据">
+</p>
+
 # old-coder skill（老码农 skill）
 
 > 本文是 [README.md](README.md) 的中文版。
