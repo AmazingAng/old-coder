@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/old-coder-github-banner.png" alt="old-coder: SPEC → GAUNTLET → EVIDENCE">
+</p>
+
 # old-coder
 
 *[中文说明 →](README-zh.md)*
@@ -75,7 +79,7 @@ skills/old-coder/         the skill (SKILL.md + references/gauntlet.md)
 demo-rate-limiter/        a rate limiter built end-to-end under the skill
 ```
 
-The demo's `evidence.md` is the point of the exercise: 16 tests, 100% branch coverage of the code, 8/8 planted bugs caught — and the process found a real bug the tests had missed (a `NaN` time window slipping through validation). Rerun the whole report:
+The demo's `evidence.md` is the point of the exercise: 17 tests, 100% branch coverage of the code, 8/8 planted bugs caught — and the process found a real bug the tests had missed (a `NaN` time window slipping through validation). Rerun the whole report:
 
 ```sh
 cd demo-rate-limiter

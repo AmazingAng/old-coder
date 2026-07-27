@@ -1,8 +1,12 @@
-# old-coder（中文说明）
+<p align="center">
+  <img src="assets/old-coder-github-banner-zh.png" alt="old-coder：SPEC → 关卡 → 证据">
+</p>
+
+# old-coder（老码农）
 
 > 本文是 [README.md](README.md) 的中文版。
 
-**一位老码农写给 agent 时代的策略：不读代码——让代码闯关。**
+**老码农在 Agent 时代的智慧：不读代码，让代码闯过层层关卡。**
 
 一个让 coding agent **自证其码**的 skill。你不用逐行读 agent 写的代码——agent 必须让代码闯过一整套检查关卡，并且在写代码前交给你一份测试计划、写完后交给你一份证据报告。你审的是这两份文档，不是代码。
 
@@ -24,7 +28,7 @@ npx skills add https://github.com/amazingang/old-coder
 
 ## 核心想法
 
-来自 Uncle Bob（Robert C. Martin）谈与 coding agent 协作（[原推文](https://x.com/unclebobmartin/status/2080257779395154409)）：
+本项目启发于 Uncle Bob（Robert C. Martin）关于 coding agent 协作的观点（[原推文](https://x.com/unclebobmartin/status/2080257779395154409)）：
 
 > 我目前的策略是完全不读 agent 写的任何代码。只有这样，我才能真正享受它们带来的生产力。我做的是用极端的约束把 agent 包围起来：单元测试、gherkin 测试、QA 流程、质量指标、mutation testing、测试覆盖率，以及其他一大堆手段。最终我对它们产出的代码有非常高的信心，因为这些代码闯过了我所有约束和测试组成的关卡（gauntlet）。
 
@@ -38,8 +42,8 @@ flowchart LR
     RED["🔴 RED<br/>先写测试，<br/>亲眼看它失败"]
     GREEN["🟢 GREEN<br/>写代码直到<br/>测试通过"]
     REF["🧹 REFACTOR<br/>清理代码，<br/>测试一字不动"]
-    G["🛡️ GAUNTLET<br/>跑完所有检查"]
-    EV["📊 EVIDENCE<br/>你读报告，<br/>不读代码"]
+    G["🛡️ 关卡<br/>跑完所有检查"]
+    EV["📊 证据<br/>你读报告，<br/>不读代码"]
     SPEC --> RED --> GREEN --> REF --> G --> EV
     REF -. 下一个行为 .-> RED
 ```
@@ -47,9 +51,9 @@ flowchart LR
 你只需要读两份文档：
 
 - **SPEC**（写代码之前）——代码必须做什么、必须不做什么的具体例子，外加 agent 想装哪些工具。批准它，是你唯一要做的决定。
-- **EVIDENCE**（写完代码之后）——来自最后一次完整运行的真实数字，你自己一条命令就能重跑验证。
+- **证据**（写完代码之后）——来自最后一次完整运行的真实数字，你自己一条命令就能重跑验证。
 
-中间的关卡（gauntlet）：
+中间的“关卡”：
 
 | 检查 | 它回答的问题 |
 |---|---|
@@ -75,7 +79,7 @@ skills/old-coder/         skill 本体（SKILL.md + references/gauntlet.md）
 demo-rate-limiter/        按此 skill 端到端做出来的限流器示例
 ```
 
-demo 的 `evidence.md` 就是重点：16 个测试、代码 100% 分支覆盖、8/8 个埋入的 bug 全部被抓——过程中还发现了一个测试没抓到的真 bug（`NaN` 时间窗口穿过了参数校验）。整份报告可以重跑：
+demo 的 `evidence.md` 就是重点：17 个测试、代码 100% 分支覆盖、8/8 个埋入的 bug 全部被抓——过程中还发现了一个测试没抓到的真 bug（`NaN` 时间窗口穿过了参数校验）。整份报告可以重跑：
 
 ```sh
 cd demo-rate-limiter
