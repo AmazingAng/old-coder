@@ -2,14 +2,14 @@
 
 - Spec approval: **not obtained (autonomous run)** — confidence claim is
   correspondingly reduced; `spec.md` is the artifact to review after the fact.
-- Source state: git commit `9b63d4c`; sha256 tree hash `941518c42589438d` —
+- Source state: git commit `a0f54a1`; sha256 tree hash `a6b9851f5af585de` —
   reproduce both with `./tools/source_state.sh` (works from any directory).
 - Toolchain: pinned in `requirements-dev.txt` (local run: Python 3.14.3;
   CI runs the same gauntlet on 3.12 via `.github/workflows/gauntlet.yml`).
 - Entry point: `./tools/gauntlet.sh` reruns every layer below.
 
 All numbers are from one final fresh run of the entry point, executed
-2026-07-27 after the last code edit.
+2026-08-06 after the last code edit.
 
 ## Spec → Test mapping
 
@@ -29,7 +29,7 @@ Status legend: pass / fail / unverified / n-a.
 | Invariant P1 (window count ≤ limit) | test_properties.py::test_p1_allowed_count_within_any_window_never_exceeds_limit | pass |
 | Invariant P2 (key independence) | test_properties.py::test_p2_other_keys_traffic_never_changes_one_keys_outcomes | pass |
 | Must NOT: denials store nothing (no memory growth) | test_ratelimiter.py::test_must_not_denials_store_nothing + mutant M8 | pass |
-| Must NOT: no real sleep/wall-clock in tests | layer: `grep -rn "time\." tests/` → no matches (FakeClock only) | pass |
+| Must NOT: no real sleep/wall-clock in tests | layer: must-not scan in `tools/gauntlet.sh` (`time\.` over tests/) → no matches (FakeClock only) | pass |
 
 ## Gauntlet (final fresh run: `./tools/gauntlet.sh`)
 
@@ -43,9 +43,9 @@ Status legend: pass / fail / unverified / n-a.
 | Property-based | hypothesis, 2 properties | 100 examples each, 0 falsified |
 | Real execution | `python examples/demo.py` (real `time.monotonic`) | burst of 5 → `[True, True, True, False, False]`; other key unaffected; allowed again after window |
 | Supply chain | `pip-audit -r requirements-dev.txt` | no known vulnerabilities; runtime dependencies: **none** (stdlib only), dev toolchain pinned & justified in spec setup plan |
-| Secret scan | pattern grep over demo sources (api key / secret / password / token / private key) | clean, no matches |
+| Secret scan | must-not scan in `tools/gauntlet.sh` (api key / secret / password / token / private key over src, tests, tools, examples) | clean, no matches |
 | License check | — | n-a: zero runtime dependencies, nothing redistributed beyond this repo's own MIT code; dev tools are not shipped |
-| Suite health | pytest-randomly (order shuffled every run, e.g. seed 2606823942) | 17 passed in randomized order |
+| Suite health | pytest-randomly (order shuffled every run; seed printed in non-quiet runs) | 17 passed in randomized order |
 
 ## Skipped layers
 
@@ -82,6 +82,19 @@ Status legend: pass / fail / unverified / n-a.
   behavior, a deterministic test was written and proven non-vacuous against
   M2 alone. Property-based kills are stochastic; deterministic behaviors
   deserve deterministic tests.
+- **Checker negative controls** (2026-08-06, prompted by a community issue on
+  fail-open checkers): the two must-not greps were folded into
+  `tools/gauntlet.sh` with explicit exit-code handling (grep rc 1 = pass,
+  rc 0 = forbidden pattern found, rc ≥ 2 = broken check — both fail). Each
+  failure branch was proven able to fire with one-off controls: a planted
+  `time.sleep` fixture (failed as required), a chmod-000 unreadable file
+  (failed closed), a nonexistent scan path (failed closed); fixtures removed
+  after. During the fold-in the secret scan caught its own pattern literal in
+  the script — a true positive, resolved by bracketing letters in the pattern
+  (`s[e]cret`), not by excluding the file. This repo's own history includes a
+  fail-open checker: `tools/mutants.py` originally counted any nonzero pytest
+  exit as a kill, so usage errors (exit 4/5) would have faked whole-batch
+  kills; fixed earlier (only exit 1 counts, errors invalidate the run).
 - **Git history note**: the demo originally ran without git (restores were
   verified by suite rerun + tree hash). The repo is now under git; source
   state above cites the commit.
