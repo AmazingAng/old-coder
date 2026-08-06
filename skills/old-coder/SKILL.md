@@ -126,6 +126,19 @@ properties verify anything; survivors there mean the invariants have blind
 spots (a common one: a one-sided invariant like "never exceeds limit" cannot
 catch fail-closed bugs — pair it with the opposite bound).
 
+Checker note — the gauntlet is only as trustworthy as its checkers, and the
+dangerous checker failure is fail-open: nothing crashes, the layer prints pass.
+Off-the-shelf tools (pytest, mypy, tsc…) have earned their failure behavior;
+home-grown checks — grep gates, custom scripts, the manual mutation runner —
+have not, so two rules apply to them: (1) **fail closed** — a crash, an
+unreadable input, an unexpected exit code, or an item silently skipped inside
+gate code is a hard failure of the layer, never a pass; no `|| true`, no
+`2>/dev/null`, no bare fallthrough. (2) **Prove it can fail before trusting
+its pass**: run it once against a known-bad input (a negative control) and
+watch it fail — the RED principle applied to checkers, exactly like the
+throwaway mutant for an immediately-passing test. Record the control in
+EVIDENCE.
+
 Equivalent-mutant note — with a mutation tool, a survivor is not automatically
 a failure: some mutants are semantically equivalent to the original and cannot
 be killed. Classify such survivors as "equivalent, because <reason>" in

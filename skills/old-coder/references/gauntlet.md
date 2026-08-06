@@ -108,6 +108,16 @@ whole report with it. Pin dev-tool versions
 (requirements-dev.txt, package.json devDependencies with exact versions, etc.)
 so the rerun uses the same gauntlet.
 
+Gate code itself must fail closed (see the checker note in SKILL.md): `set -e`
+at the top, no `|| true`, no `2>/dev/null`, and spell out the exit-code cases
+of any command whose codes are ambiguous. The classic trap is a
+must-find-nothing grep: rc 1 (no matches) is the only pass; rc 0 means the
+forbidden pattern exists, and rc ≥ 2 means the check itself broke (unreadable
+input, bad pattern) — both must fail the layer, or an unreadable file turns
+into a vacuous pass. Prove each home-grown check can fail with a one-off
+negative control (feed it a known-bad fixture; make its input unreadable) and
+record the control in EVIDENCE's honest notes.
+
 ## Gherkin scenario template (for the SPEC step)
 
 ```gherkin
