@@ -2,14 +2,14 @@
 
 - Spec approval: **not obtained (autonomous run)** — confidence claim is
   correspondingly reduced; `spec.md` is the artifact to review after the fact.
-- Source state: git commit `a0f54a1`; sha256 tree hash `a6b9851f5af585de` —
+- Source state: git commit `d6e17b1`; sha256 tree hash `50433e0a4acc8507` —
   reproduce both with `./tools/source_state.sh` (works from any directory).
 - Toolchain: pinned in `requirements-dev.txt` (local run: Python 3.14.3;
   CI runs the same gauntlet on 3.12 via `.github/workflows/gauntlet.yml`).
 - Entry point: `./tools/gauntlet.sh` reruns every layer below.
 
 All numbers are from one final fresh run of the entry point, executed
-2026-08-06 after the last code edit.
+2026-08-08 after the last code edit.
 
 ## Spec → Test mapping
 
@@ -35,6 +35,7 @@ Status legend: pass / fail / unverified / n-a.
 
 | Layer | Command | Result |
 |---|---|---|
+| Checker self-test | `sh tools/test_gauntlet_checks.sh` (first layer; asserts the must-not scan fails on a planted pattern, passes on a clean tree, and fails closed with a distinct rc 2 when the scan itself breaks) | 3/3 expectations ok |
 | Tests | `pytest -q --cov=ratelimiter` | 17 passed, 0 failed |
 | Types | `mypy src tests examples tools` (strict) | 0 errors in 6 files |
 | Lint + format + complexity | `ruff check . && ruff format --check .` (includes mccabe complexity budget ≤ 8) | 0 warnings, 8 files formatted |
@@ -92,7 +93,13 @@ Status legend: pass / fail / unverified / n-a.
   after. Those one-off controls are now standing: `tools/test_gauntlet_checks.sh`
   runs as the gauntlet's first layer and asserts all three outcomes against the
   real `must_not_match` sourced from `tools/must_not_match.sh`, so a regression
-  in the helper fails the run rather than passing vacuously. During the fold-in
+  in the helper fails the run rather than passing vacuously (contributed in
+  PR #3). Post-merge tightening (2026-08-08): the broken-scan branch now
+  returns rc 2, distinct from the pattern-present rc 1, and the self-test
+  asserts the distinction — so a regression that mixes up the two failure
+  branches cannot pass either. Proven non-vacuous with a throwaway mutant:
+  reverting the helper to `return 1` made the self-test fail as required
+  (want rc 2, got rc 1), then the helper was restored. During the fold-in
   the secret scan caught its own pattern literal in
   the script — a true positive, resolved by bracketing letters in the pattern
   (`s[e]cret`), not by excluding the file. This repo's own history includes a
