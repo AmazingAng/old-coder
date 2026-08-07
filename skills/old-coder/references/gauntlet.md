@@ -58,17 +58,6 @@ Makefile / CI config first). These are the defaults when nothing exists.
 | Mutation | PIT | `./mvnw test-compile org.pitest:pitest-maven:mutationCoverage` / `./gradlew pitest`; scope changed packages or classes |
 | Property-based | jqwik | write `@Property` tests; the normal JUnit test command runs them |
 
-## Emacs Lisp
-
-| Layer | Tool | Command |
-|---|---|---|
-| Tests | ERT | `emacs -Q --batch -L . -l ert -l <test-file> -f ert-run-tests-batch-and-exit` |
-| Compile checks | byte compiler | `emacs -Q --batch -L . --eval '(setq byte-compile-error-on-warn t)' -f batch-byte-compile <files>` |
-| Lint | package-lint + checkdoc | run `package-lint-batch-and-exit` and `checkdoc` in batch mode over every changed `.el` file |
-| Changed-form coverage | testcover / undercover.el | instrument changed files in the batch ERT runner and verify every touched form is exercised |
-| Mutation | no mature default | use the manual mutation procedure below on changed defuns and run the ERT suite for each mutant |
-| Property-based | deterministic ERT generators | generate inputs in an `ert-deftest`, pin the random seed, and assert invariants |
-
 ## Scala
 
 | Layer | Tool | Command |
@@ -90,10 +79,21 @@ instance of the same database engine used in production.
 |---|---|---|
 | Tests | project/database-native tests | run the project's test command (`dbt test` for dbt), including migrations, constraints, and result-set assertions |
 | Parse + schema checks | SQLFluff + target database | `sqlfluff parse --dialect <dialect> <changed.sql>`, then prepare, explain, or execute each changed statement against the disposable database |
-| Lint + format | SQLFluff | `sqlfluff lint --dialect <dialect> .`; use `sqlfluff format --dialect <dialect> .` to apply fixes |
+| Lint + format | SQLFluff | `sqlfluff lint --dialect <dialect> .`; apply rule fixes with `sqlfluff fix` (`sqlfluff format` handles layout only) |
 | Changed-statement coverage | spec-to-test mapping | map every changed statement, predicate branch, constraint, and migration direction to an integration test; record any unexercised item |
 | Mutation | manual | use the manual procedure below to alter predicates, joins, aggregates, constraints, and migration steps; every mutant must fail a test |
 | Property-based | host-language generator + target database | generate rows and assert schema, query, and round-trip invariants through the project test runner |
+
+## Emacs Lisp
+
+| Layer | Tool | Command |
+|---|---|---|
+| Tests | ERT | `emacs -Q --batch -L . -l ert -l <test-file> -f ert-run-tests-batch-and-exit` |
+| Compile checks | byte compiler | `emacs -Q --batch -L . --eval '(setq byte-compile-error-on-warn t)' -f batch-byte-compile <files>` |
+| Lint | package-lint + checkdoc | run `package-lint-batch-and-exit` and `checkdoc` in batch mode over every changed `.el` file |
+| Changed-form coverage | testcover / undercover.el | instrument changed files in the batch ERT runner and verify every touched form is exercised |
+| Mutation | no mature default | use the manual mutation procedure below on changed defuns and run the ERT suite for each mutant |
+| Property-based | deterministic ERT generators | generate inputs in an `ert-deftest`, pin the random seed, and assert invariants |
 
 ## Extended layer menu (any ecosystem)
 
