@@ -47,6 +47,54 @@ Makefile / CI config first). These are the defaults when nothing exists.
 | Mutation | cargo-mutants | `cargo mutants --file <changed file>` |
 | Property-based | proptest | `proptest!` macros |
 
+## Java
+
+| Layer | Tool | Command |
+|---|---|---|
+| Tests | JUnit 5 via Maven / Gradle | `./mvnw test` / `./gradlew test` |
+| Types | javac via Maven / Gradle | `./mvnw compile` / `./gradlew classes` |
+| Lint + format | Checkstyle + Spotless | `./mvnw checkstyle:check spotless:check` / `./gradlew check spotlessCheck` |
+| Changed-line coverage | JaCoCo | `./mvnw verify` / `./gradlew test jacocoTestReport`, then inspect the XML/HTML report for touched lines and branches |
+| Mutation | PIT | `./mvnw test-compile org.pitest:pitest-maven:mutationCoverage` / `./gradlew pitest`; scope changed packages or classes |
+| Property-based | jqwik | write `@Property` tests; the normal JUnit test command runs them |
+
+## Emacs Lisp
+
+| Layer | Tool | Command |
+|---|---|---|
+| Tests | ERT | `emacs -Q --batch -L . -l ert -l <test-file> -f ert-run-tests-batch-and-exit` |
+| Compile checks | byte compiler | `emacs -Q --batch -L . --eval '(setq byte-compile-error-on-warn t)' -f batch-byte-compile <files>` |
+| Lint | package-lint + checkdoc | run `package-lint-batch-and-exit` and `checkdoc` in batch mode over every changed `.el` file |
+| Changed-form coverage | testcover / undercover.el | instrument changed files in the batch ERT runner and verify every touched form is exercised |
+| Mutation | no mature default | use the manual mutation procedure below on changed defuns and run the ERT suite for each mutant |
+| Property-based | deterministic ERT generators | generate inputs in an `ert-deftest`, pin the random seed, and assert invariants |
+
+## Scala
+
+| Layer | Tool | Command |
+|---|---|---|
+| Tests | MUnit / ScalaTest via sbt | `sbt test` |
+| Types | Scala compiler | `sbt "compile" "Test / compile"` |
+| Lint + format | Scalafix + Scalafmt | `sbt scalafmtCheckAll "scalafixAll --check"` |
+| Changed-line coverage | scoverage | `sbt clean coverage test coverageReport`, then inspect the report for touched statements and branches |
+| Mutation | Stryker4s | `sbt stryker`; scope `mutate` to changed source files when the full project is slow |
+| Property-based | ScalaCheck | define `Properties` or framework-integrated properties; `sbt test` runs them |
+
+## SQL
+
+SQL has no portable test runner or type checker. Configure the actual dialect,
+use the project's migration/query framework, and validate against a disposable
+instance of the same database engine used in production.
+
+| Layer | Tool | Command |
+|---|---|---|
+| Tests | project/database-native tests | run the project's test command (`dbt test` for dbt), including migrations, constraints, and result-set assertions |
+| Parse + schema checks | SQLFluff + target database | `sqlfluff parse --dialect <dialect> <changed.sql>`, then prepare, explain, or execute each changed statement against the disposable database |
+| Lint + format | SQLFluff | `sqlfluff lint --dialect <dialect> .`; use `sqlfluff format --dialect <dialect> .` to apply fixes |
+| Changed-statement coverage | spec-to-test mapping | map every changed statement, predicate branch, constraint, and migration direction to an integration test; record any unexercised item |
+| Mutation | manual | use the manual procedure below to alter predicates, joins, aggregates, constraints, and migration steps; every mutant must fail a test |
+| Property-based | host-language generator + target database | generate rows and assert schema, query, and round-trip invariants through the project test runner |
+
 ## Extended layer menu (any ecosystem)
 
 Always-on layers live in SKILL.md's table; these are picked per task by the
@@ -177,4 +225,3 @@ Status is one of: **pass / fail / unverified / n-a**. A row mapped to
 ### Honest notes
 - <failures hit during the task and how they were resolved; spec revisions; anything reducing confidence>
 ```
-
