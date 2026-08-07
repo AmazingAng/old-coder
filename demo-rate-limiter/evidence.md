@@ -89,7 +89,11 @@ Status legend: pass / fail / unverified / n-a.
   failure branch was proven able to fire with one-off controls: a planted
   `time.sleep` fixture (failed as required), a chmod-000 unreadable file
   (failed closed), a nonexistent scan path (failed closed); fixtures removed
-  after. During the fold-in the secret scan caught its own pattern literal in
+  after. Those one-off controls are now standing: `tools/test_gauntlet_checks.sh`
+  runs as the gauntlet's first layer and asserts all three outcomes against the
+  real `must_not_match` sourced from `tools/must_not_match.sh`, so a regression
+  in the helper fails the run rather than passing vacuously. During the fold-in
+  the secret scan caught its own pattern literal in
   the script — a true positive, resolved by bracketing letters in the pattern
   (`s[e]cret`), not by excluding the file. This repo's own history includes a
   fail-open checker: `tools/mutants.py` originally counted any nonzero pytest

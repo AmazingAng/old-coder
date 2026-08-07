@@ -5,16 +5,10 @@ cd "$(dirname "$0")/.."
 rm -f .coverage coverage.xml   # stale artifacts from previous runs
 PY=.venv/bin
 
-# Must-find-nothing grep, fail closed: rc 1 (no matches) is the only pass;
-# rc 0 = forbidden pattern present, rc >= 2 = the check itself broke.
-must_not_match() {
-  pattern=$1; shift
-  if grep -rniE "$pattern" "$@"; then
-    echo "FAIL: forbidden pattern present: $pattern"; return 1
-  elif [ $? -ne 1 ]; then
-    echo "FAIL: scan itself broke (fail closed): $pattern"; return 1
-  fi
-}
+. tools/must_not_match.sh
+
+echo "=== checker self-test ==="
+sh tools/test_gauntlet_checks.sh
 
 echo "=== tests + coverage ==="
 "$PY/pytest" -q --cov=ratelimiter --cov-report=term-missing
