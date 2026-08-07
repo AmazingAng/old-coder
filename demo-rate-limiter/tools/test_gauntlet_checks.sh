@@ -34,13 +34,15 @@ rm "$work/tree/dirty.txt"
 must_not_match 'forbidden' "$work/tree" >/dev/null 2>&1
 expect 0 $? "clean tree passes"
 
-# 3. The scan itself breaks -> must fail. This is the fail-open guard: grep
-#    exits >= 2 here, which must never be read as "no matches". A nonexistent
-#    path is used rather than an unreadable (chmod 000) file: root can still
-#    read a chmod-000 file, so that variant would need a skip branch to stay
+# 3. The scan itself breaks -> must fail with rc 2, distinct from the
+#    pattern-present rc 1, so a regression that mixes up the two failure
+#    branches cannot pass. This is the fail-open guard: grep exits >= 2 here,
+#    which must never be read as "no matches". A nonexistent path is used
+#    rather than an unreadable (chmod 000) file: root can still read a
+#    chmod-000 file, so that variant would need a skip branch to stay
 #    portable, and a silent skip is the thing this check exists to prevent.
 must_not_match 'forbidden' "$work/tree/no-such-path" >/dev/null 2>&1
-expect 1 $? "broken scan fails closed"
+expect 2 $? "broken scan fails closed"
 
 if [ "$failures" -ne 0 ]; then
   echo "FAIL: $failures fail-closed expectation(s) violated"
