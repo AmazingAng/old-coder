@@ -23,7 +23,9 @@ requests = st.lists(st.tuples(timestamps, keys), max_size=60)
 # P2 needs the target key to recur, so it keeps a small pool — but the pool is
 # no longer three single characters. The widening above was applied to P1 only
 # in the first pass, directly under the comment explaining it; P2 was left
-# behind and killed none of M1/M5/M12 in attribution.
+# behind. What the widening fixed is the strip()-merge blindness (the pool held
+# "c " but not "c", so no two members could merge). It did NOT change P2's
+# attribution: measured, P2 alone still kills none of M1/M5/M12.
 isolation_keys = st.sampled_from(["a", "ab", "Ab", "b", "bc", "c", "c "])
 isolation_requests = st.lists(st.tuples(timestamps, isolation_keys), max_size=60)
 limits = st.integers(min_value=1, max_value=5)

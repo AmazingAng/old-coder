@@ -146,17 +146,28 @@ Feature: Sliding-window rate limiting per key
   cover "every spelling", which a regex cannot do — dynamic imports, renamed
   helpers, and a caller's own `sleep()` all escape it. The gate blocks known
   direct wall-clock imports and calls; that is its actual scope.]
-  **Declared exception**: the concurrency tests use `Event.wait(timeout=)` and
-  `Thread.join(timeout=)` as deadlock guards, and the atomicity test asserts
-  that a blocked thread is still alive after 0.2s. That last assertion is a
-  genuine wall-clock dependence, accepted deliberately: the alternative is a
-  concurrency test that can hang forever. It is one-sided — it can only fail
-  spuriously if a thread is starved for 0.2s — and no limiter in any test
-  reads a real clock.
+  **Declared exception** [corrected in 4d]: the concurrency tests use
+  `Event.wait(timeout=)` and `Thread.join(timeout=)`. Most are deadlock guards,
+  but TWO are genuine wall-clock dependences and they fail in OPPOSITE
+  directions, which the 4b wording got wrong by naming only the first:
+  (1) the atomicity test asserts a blocked thread is still alive after 0.2s —
+  spurious failure only, if a thread is starved that long;
+  (2) `second_done.wait(timeout=0.3)` in the clock-ordering test is not a
+  guard at all: on healthy code it ALWAYS times out (a fixed 0.3s per suite
+  run), and on the mutant that moves the clock read outside the lock the kill
+  depends on the second caller finishing inside that budget. Its spurious
+  direction is therefore a false PASS — a surviving fail-open mutant, the
+  worse direction. Measured margin is ~470x (0.06-0.63ms of 300ms), so it is
+  accepted, not ignored. No limiter in any test reads a real clock.
 - No unbounded memory growth. [REVISION 4: this clause used to read "from
   denied requests (denials store nothing)". Denials were never the leak;
-  *allowed* requests from keys that never return were. Growth is now bounded
-  by the distinct keys seen within one window — see the idle-keys scenario.]
+  *allowed* requests from keys that never return were. Growth is bounded by
+  the distinct keys seen within TWO windows — see the idle-keys scenario.
+  REVISION 4d: this clause and the class docstring both said "one window" and
+  were literally false. Because the sweep is throttled to once per window, a
+  key can sit idle for just under 2W before the sweep that drops it runs. Only
+  the residual-risk section had it right; the idle-keys test probed at 2W, so
+  it passed under either reading and pinned neither.]
 
 ## Clock contract [REVISION 4]
 
@@ -178,7 +189,16 @@ temporal memory bound for NaN-poisoned keys**, which is stated here rather
 than left to be inferred. The third NaN injection point is the clock itself,
 and it stays a caller obligation rather than a check because validating every
 reading puts a branch on the hot path for a fault `time.monotonic` cannot
-produce.
+produce. [4d] A NaN reading also destroys the sweep throttle permanently:
+`_last_sweep` becomes NaN, every subsequent comparison against it is false,
+and the sweep then runs an O(distinct keys) scan on every request for the
+life of the process. The 4c paragraph described the never-expiring hit as if
+that were the whole mode; it is not.
+
+`clock` is the only constructor parameter with no validation. That is
+deliberate — a non-callable clock raises TypeError at the first `allow()`,
+which is loud and fail-closed, not the silent acceptance the hostile-config
+row is about. [4d]
 
 `clock` MUST NOT call back into the same limiter. [REVISION 4c] The clock is
 read inside the critical section, so a reentrant clock deadlocks on a

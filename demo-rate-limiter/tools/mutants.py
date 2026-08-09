@@ -138,6 +138,19 @@ MUTANTS = [
         "if now - hits[-1] > self._window]\n",
         "if now - hits[-1] >= self._window]\n",
     ),
+    # [REVISION 4d] Round 4 found the throttle was an asserted design property
+    # with no catcher, and that a one-sided comparison suspended it entirely
+    # under backward skew.
+    (
+        "M19 drop the sweep throttle (O(keys) scan on every request)",
+        "        self._last_sweep = now\n",
+        "",
+    ),
+    (
+        "M20 one-sided sweep throttle (backward skew suspends reclamation)",
+        "if 0 <= now - self._last_sweep <= self._window:",
+        "if now - self._last_sweep <= self._window:",
+    ),
 ]
 
 

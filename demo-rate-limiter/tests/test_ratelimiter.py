@@ -156,6 +156,56 @@ def test_sweep_keeps_a_key_whose_newest_hit_is_exactly_window_old(
     assert limiter.allow("k") is False
 
 
+def test_the_memory_bound_is_two_windows_not_one(clock: FakeClock) -> None:
+    # The docstring and the Must NOT both said "one window" and were literally
+    # false: because the sweep is throttled, a key can stay idle for nearly two
+    # windows. The old idle-keys test probed at 2x the window, so it passed
+    # under either reading and pinned neither. This pins both sides.
+    limiter = RateLimiter(limit=5, window_seconds=60, clock=clock)
+    assert limiter.allow("armer") is True  # t=0, arms the sweep clock
+    clock.now = 1.0
+    assert limiter.allow("idle") is True  # last hit at t=1
+    clock.now = 60.9  # sweep fires: drops armer, keeps idle
+    assert limiter.allow("probe") is True
+    clock.now = 100.0  # idle for 99s — already longer than one window
+    assert limiter.allow("probe") is True
+    assert "idle" in limiter._hits, "one window is not the real bound"
+    clock.now = 121.0  # next sweep is now due
+    assert limiter.allow("probe") is True
+    assert "idle" not in limiter._hits, "two windows must be the bound"
+
+
+def test_backward_clock_skew_does_not_suspend_the_sweep(clock: FakeClock) -> None:
+    # The throttle compares now against the last sweep time. After a backward
+    # jump, now stays below it and the sweep never runs again until the clock
+    # catches up — measured 20,001 keys retained across seven windows of
+    # monotone time. The quota side fails closed under skew; the memory side
+    # did not, and no test looked at len(_hits) after a jump.
+    limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
+    clock.now = 1_000_000.0
+    assert limiter.allow("arm") is True
+    clock.now = 0.0  # clock jumps backward
+    for i in range(200):
+        clock.now = i * 2.0
+        limiter.allow(f"key-{i}")
+    assert len(limiter._hits) < 100, f"sweep suspended: {len(limiter._hits)} keys held"
+
+
+def test_the_sweep_is_throttled_to_once_per_window(clock: FakeClock) -> None:
+    # "at most once per window" carries the accepted-residual-risk argument,
+    # but nothing pinned it: deleting the throttle bookkeeping made the sweep
+    # run an O(keys) scan on every request and the whole suite stayed green.
+    limiter = RateLimiter(limit=5, window_seconds=60, clock=clock)
+    assert limiter.allow("k") is True
+    assert limiter._last_sweep == 0.0
+    clock.now = 30.0
+    assert limiter.allow("k") is True
+    assert limiter._last_sweep == 0.0, "swept again inside the same window"
+    clock.now = 61.0
+    assert limiter.allow("k") is True
+    assert limiter._last_sweep == 61.0, "did not sweep after a full window"
+
+
 def test_idle_keys_are_forgotten_key_map_is_bounded(clock: FakeClock) -> None:
     limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
     for i in range(1000):

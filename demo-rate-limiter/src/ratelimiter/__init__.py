@@ -37,9 +37,12 @@ class RateLimiter:
     expire early. A forward jump expires every hit at once — that is a caller
     obligation, not a defect (see the clock contract in spec.md).
 
-    Safe to call from multiple threads. Memory is bounded by the number of
-    distinct keys seen within one window: keys idle for a full window are
-    dropped by a sweep that runs at most once per window.
+    Safe to call from multiple threads. Memory is bounded by the distinct
+    keys seen within TWO windows, not one: a key is dropped by the first sweep
+    that runs more than a window after its last hit, and sweeps are throttled
+    to at most one per window, so worst-case retention is just under 2W. The
+    bound is temporal, not cardinal — see the accepted residual risk in
+    spec.md.
     """
 
     def __init__(
@@ -77,7 +80,11 @@ class RateLimiter:
 
     def _sweep(self, now: float) -> None:
         """Forget keys idle for a full window. Runs at most once per window."""
-        if now - self._last_sweep <= self._window:
+        # The lower bound matters: after a backward clock jump `now` sits below
+        # _last_sweep, and a one-sided `<= window` test then suspends the sweep
+        # until the clock catches up — measured 20,001 keys retained. Treating a
+        # negative delta as "sweep now" re-arms the throttle at the new time.
+        if 0 <= now - self._last_sweep <= self._window:
             return
         self._last_sweep = now
         idle = [k for k, hits in self._hits.items() if now - hits[-1] > self._window]

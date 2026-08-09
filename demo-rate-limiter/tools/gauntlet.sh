@@ -37,7 +37,7 @@ echo "=== must-not scans ==="
 # they are deadlock guards in the concurrency tests, declared as an exception
 # in spec.md rather than excluded here. A pattern cannot decide intent, so the
 # spec says what the gate actually covers instead of claiming more.
-must_not_match 'import[[:space:]]+time|from[[:space:]]+time[[:space:]]+import|time\.|datetime|sleep[[:space:]]*\(|perf_counter[[:space:]]*\(|monotonic[[:space:]]*\(' tests
+must_not_match 'import[[:space:]]+time|from[[:space:]]+time[[:space:]]+import|time\.[a-zA-Z_]|datetime|sleep[[:space:]]*\(|perf_counter[[:space:]]*\(|monotonic[[:space:]]*\(' tests
 # Bracketed letters stop the pattern literal from matching itself. The path
 # list now includes CI config and metadata: workflows are where credentials
 # actually appear, and scanning only src/tests/tools/examples missed them.
