@@ -81,12 +81,34 @@ Feature: Sliding-window rate limiting per key
     window, and "60" raised a bare TypeError from math.isfinite instead of
     naming the parameter the invalid-construction scenario promises)
 
-  Scenario: keys are compared as exact strings  [REVISION 4b]
+  Scenario: keys are compared as exact strings  [REVISION 4b, widened in 4c]
     Given a limiter with limit 1 per 60 seconds
-    When "Alice" and "alice" each make a request
-    Then both are allowed — they are different callers
-    (every key elsewhere in the suite is lowercase, so any normalisation of
-    the key was structurally invisible to the whole gauntlet)
+    When "Alice", "alice", "alice " and " " each make a request
+    Then all are allowed — they are four different callers
+    (every key elsewhere in the suite was lowercase and unpadded, so key
+    normalisation was structurally invisible. Case was pinned in 4b and
+    trimming still survived it, so padding is pinned too. A whitespace-only
+    key is a valid caller by the same rule: the contract is "non-empty str",
+    and deciding that " " is not a real caller is the caller's business.)
+
+  Scenario: the sweep keeps a key whose newest hit is exactly one window old
+    [REVISION 4c]
+    Given a limiter with limit 1 per 60 seconds
+    And another key's request at t=0 that arms the sweep, and "k" at t=1
+    When any request arrives at t=61, firing the sweep
+    Then "k" is still limited — its hit is exactly 60s old, not older
+    (the exact-boundary scenario pins _prune's comparison; _sweep re-implements
+    the same age test and nothing pinned it, so a >= there forgot a key that
+    still had a live hit and reset that caller's quota)
+
+  Scenario: concurrent commits never invert against the clock read
+    [REVISION 4c]
+    Given two callers whose clock reads are forced to return different values
+    When the caller that read the earlier value commits second
+    Then the recorded hits are still in ascending order
+    (both _prune and _sweep assume that order; the lock originally covered
+    check-and-append but not the clock read, and every other concurrency test
+    held time constant so the whole class of ordering races was invisible)
 
   Scenario: key must be a non-empty string  [REVISION 4]
     When calling allow() with None, an int, bytes, or ""
@@ -146,14 +168,22 @@ obligation, stated here because the failure model previously implied the
 non-monotonic scenario covered skew in both directions. It covers backward
 skew only.
 
-`clock` MUST also return a finite number. [REVISION 4b] A NaN reading is
-recorded as a hit that can never expire by pruning — `now - nan > window` is
-always false — so it permanently consumes one slot of that key's quota until
-an idle window lets the sweep drop the key. The spec sweeps NaN out of
-`limit` and `window_seconds`; the third injection point is the clock itself,
-and it is a caller obligation rather than a check, because validating every
-reading would put a branch on the hot path for a fault `time.monotonic` cannot
+`clock` MUST also return a finite number. [REVISION 4b, corrected in 4c] A NaN
+reading is recorded as a hit that can never expire: `now - nan > window` is
+always false, in `_prune` **and in `_sweep`**. Revision 4b claimed the sweep
+would eventually reclaim such a key; it cannot — the sweep uses the same
+comparison. Measured: once a key's newest hit is NaN, the key is retained
+through t=1e18 and that caller is denied forever. **This falsifies the
+temporal memory bound for NaN-poisoned keys**, which is stated here rather
+than left to be inferred. The third NaN injection point is the clock itself,
+and it stays a caller obligation rather than a check because validating every
+reading puts a branch on the hot path for a fault `time.monotonic` cannot
 produce.
+
+`clock` MUST NOT call back into the same limiter. [REVISION 4c] The clock is
+read inside the critical section, so a reentrant clock deadlocks on a
+non-reentrant lock. This is the price of the fix for the ordering race and is
+recorded as an obligation rather than hidden.
 
 ## Accepted residual risk [REVISION 4b]
 
@@ -190,7 +220,9 @@ shown to fail is a defect, not a mapping.]
 | backward clock skew opening the gate | non-monotonic clock scenario, jump exceeding the window; mutant M10 killed |
 | forward clock skew resetting all quota | **not covered — caller obligation**; see Clock contract |
 | a non-finite clock reading freezing a hit in the window | **not covered — caller obligation**; see Clock contract [4b] |
-| caller identity silently merged (key normalisation) | exact-strings scenario; mutant M14 killed [4b] |
+| caller identity silently merged (key normalisation) | exact-strings scenario, covering case AND padding; mutants M14/M17 killed. [4c: the row previously cited case-folding only, and `key.strip()` survived it — the P2 pool held `"c "` but not `"c"`, so no two members could merge] |
+| a caller's quota reset by the sweep at the exact boundary | sweep-boundary scenario; mutant M18 killed [4c] |
+| concurrent commits inverted against the clock read | clock-ordering scenario (gated clock forces two callers to read different values); mutant M16 killed. [4c: the lock covered check-and-append but not the clock read. Both earlier concurrency tests held time constant, so no test could tell the two placements apart] |
 | unbounded memory growth (any path) | idle-keys scenario + denials test; mutants M8/M12 killed |
 | concurrent callers racing on shared state | **fault injection**: the atomicity test constructs the interleaving and kills M13 deterministically. The threaded stress test corroborates statistically (measured 5.9% per-round detection, 400 rounds) but cannot be the sole catcher — at 60 rounds the lock-removal mutant was observed surviving 1 run in 50 |
 | the mutation layer reporting kills it never ran | **negative control**: a killer and a strictly-equivalent mutant of identical size under one pinned mtime; proven non-vacuous by removing the cache defence and watching the control go red [4b] |

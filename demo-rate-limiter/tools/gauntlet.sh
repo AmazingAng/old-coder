@@ -41,7 +41,7 @@ must_not_match 'import[[:space:]]+time|from[[:space:]]+time[[:space:]]+import|ti
 # Bracketed letters stop the pattern literal from matching itself. The path
 # list now includes CI config and metadata: workflows are where credentials
 # actually appear, and scanning only src/tests/tools/examples missed them.
-must_not_match 'api[_-]?key|s[e]cret|pass[w]ord|t[o]ken|private[_-]?key' \
+must_not_match 'api[_-]?key|s[e]cret|pass[w]ord|t[o]ken|private[_ -]?key|BEGIN[[:space:]]+[A-Z ]*PRIVATE' \
   src tests tools examples spec.md pyproject.toml requirements-dev.txt ../.github
 echo "must-not scans clean"
 echo "=== mutation ==="

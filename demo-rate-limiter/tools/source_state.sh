@@ -9,6 +9,10 @@ if git rev-parse --short HEAD >/dev/null 2>&1; then
 else
   printf "commit: (no git)\n"
 fi
+# ../.github/workflows decides whether the gauntlet runs at all in CI, so it
+# belongs in the state the evidence binds to; omitting it let CI config change
+# silently under an unchanged hash.
 tree_hash=$(find src tests tools examples pyproject.toml requirements-dev.txt spec.md \
+  ../.github/workflows \
   -type f -not -path "*__pycache__*" | sort | xargs shasum -a 256 | shasum -a 256 | cut -c1-16)
 printf "tree:   %s\n" "$tree_hash"

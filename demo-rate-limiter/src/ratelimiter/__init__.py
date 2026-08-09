@@ -59,8 +59,14 @@ class RateLimiter:
             raise TypeError(f"key must be a str, got {type(key).__name__}")
         if not key:
             raise ValueError("key must not be empty")
-        now = self._clock()
+        # The clock read belongs inside the lock. Read outside it, two callers
+        # can commit in the opposite order from which they read the clock, and
+        # the deque that _prune and _sweep both assume is ascending stops being
+        # so; _sweep then reads a stale newest-hit and forgets a key that still
+        # has a live hit, resetting that caller's quota. Cost: `clock` must not
+        # call back into this limiter (see the clock contract).
         with self._lock:
+            now = self._clock()
             self._sweep(now)
             hits = self._prune(key, now)
             if len(hits) >= self._limit:
@@ -79,7 +85,7 @@ class RateLimiter:
             del self._hits[key]
 
     def _prune(self, key: str, now: float) -> deque[float]:
-        """Drop hits older than the window; forget keys with none left."""
+        """Drop hits older than the window. Forgetting keys is _sweep's job."""
         hits = self._hits.get(key, deque())
         while hits and now - hits[0] > self._window:
             hits.popleft()

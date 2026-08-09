@@ -130,12 +130,30 @@ def test_window_seconds_must_be_a_number(clock: FakeClock, window: Any) -> None:
 
 
 def test_keys_are_compared_as_exact_strings(clock: FakeClock) -> None:
-    # Every key anywhere else in the suite is lowercase, so any normalisation
-    # of the key (case-folding, trimming) was structurally invisible.
+    # Every key anywhere else in the suite is lowercase and unpadded, so any
+    # normalisation of the key was structurally invisible. Case-folding was
+    # pinned first; trimming survived that fix, so padding is pinned too, and
+    # a whitespace-only key is a valid distinct caller by the same rule.
     limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
     assert limiter.allow("Alice") is True
     assert limiter.allow("alice") is True  # a different caller, not the same one
+    assert limiter.allow("alice ") is True  # and so is this one
+    assert limiter.allow(" ") is True  # non-empty, therefore a caller
     assert limiter.allow("Alice") is False
+
+
+def test_sweep_keeps_a_key_whose_newest_hit_is_exactly_window_old(
+    clock: FakeClock,
+) -> None:
+    # The boundary scenario above pins _prune's comparison; _sweep re-implements
+    # the same age test and nothing pinned it, so a >= there silently forgot a
+    # key that still had a live hit and reset that caller's quota.
+    limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
+    assert limiter.allow("other") is True  # t=0, arms the sweep clock
+    clock.now = 1.0
+    assert limiter.allow("k") is True
+    clock.now = 61.0  # sweep fires; k's only hit is exactly 60s old
+    assert limiter.allow("k") is False
 
 
 def test_idle_keys_are_forgotten_key_map_is_bounded(clock: FakeClock) -> None:
@@ -203,6 +221,48 @@ def test_allow_is_atomic_a_second_caller_cannot_interleave(clock: FakeClock) -> 
     first.join(timeout=5)
     second.join(timeout=5)
     assert sorted(results) == [False, True]
+
+
+def test_clock_is_read_inside_the_critical_section() -> None:
+    """The lock must cover the clock read, not just the check-and-append.
+
+    Both other concurrency tests hold time constant, so they cannot see this:
+    with one clock value no ordering between threads is observable. If the
+    read happens outside the lock, two callers can commit in the opposite
+    order from which they read the clock, leaving the deque unsorted — and
+    _sweep then judges the key by a stale newest-hit and deletes a key that
+    still has a live hit, resetting that caller's quota. Fail-open.
+    """
+    times = iter([99.0, 100.0])
+    first_read, second_done = threading.Event(), threading.Event()
+    gated: list[int] = []
+
+    def gated_clock() -> float:
+        value = next(times)
+        if not gated:
+            gated.append(1)
+            first_read.set()
+            # Read inside the lock, the second caller is blocked and this
+            # cannot be satisfied, so it times out and the order stays
+            # correct. Read outside, the second caller finishes and inverts.
+            second_done.wait(timeout=0.3)
+        return value
+
+    limiter = RateLimiter(limit=5, window_seconds=60, clock=gated_clock)
+    first = threading.Thread(target=lambda: limiter.allow("k"))
+    first.start()
+    assert first_read.wait(timeout=5), "first caller never read the clock"
+
+    def second_caller() -> None:
+        limiter.allow("k")
+        second_done.set()
+
+    second = threading.Thread(target=second_caller)
+    second.start()
+    first.join(timeout=5)
+    second.join(timeout=5)
+    hits = list(limiter._hits["k"])
+    assert hits == sorted(hits), f"commits inverted, deque unsorted: {hits}"
 
 
 def test_concurrent_callers_never_exceed_the_limit() -> None:

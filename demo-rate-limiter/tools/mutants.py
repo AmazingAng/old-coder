@@ -23,8 +23,11 @@ PYTEST = ROOT / ".venv/bin/pytest"
 # original and adjacent in the list, so M5 -- the fail-open mutant -- was
 # reported KILLED on the strength of M4's code. The bias is toward inflating
 # the kill count, which can never surface as a red gauntlet. Both defences are
-# needed: removing the cache stops a stale read, DONTWRITEBYTECODE stops a new
-# one being created mid-run.
+# needed, but not symmetrically. DONTWRITEBYTECODE alone leaves the negative
+# control green: with no .pyc written during the run, a stale one can only be
+# the pristine pre-run file, which biases toward a false SURVIVED — a red
+# gauntlet, not a silent inflation. Removing it is caught by a separate
+# tripwire below. The rmtree is what closes the between-mutants leak.
 MUTANT_ENV = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
 
 MUTANTS = [
@@ -115,6 +118,25 @@ MUTANTS = [
         "M13 drop the lock (concurrent over-allow)",
         "        with self._lock:",
         "        if True:",
+    ),
+    # [REVISION 4c] A third verification round found the lock covered the
+    # check-and-append but not the clock read, and that no test could tell the
+    # two placements apart because every concurrency test held time constant.
+    (
+        "M16 read the clock outside the lock (commits invert, deque unsorted)",
+        "        with self._lock:\n            now = self._clock()\n",
+        "        now = self._clock()\n        with self._lock:\n",
+    ),
+    (
+        "M17 strip the key (trailing-space caller merged with the bare one)",
+        '            raise ValueError("key must not be empty")\n',
+        '            raise ValueError("key must not be empty")\n'
+        "        key = key.strip()\n",
+    ),
+    (
+        "M18 sweep expiry boundary > to >= (forgets a key with a live hit)",
+        "if now - hits[-1] > self._window]\n",
+        "if now - hits[-1] >= self._window]\n",
     ),
 ]
 

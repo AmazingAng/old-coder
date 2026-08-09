@@ -24,7 +24,7 @@ requests = st.lists(st.tuples(timestamps, keys), max_size=60)
 # no longer three single characters. The widening above was applied to P1 only
 # in the first pass, directly under the comment explaining it; P2 was left
 # behind and killed none of M1/M5/M12 in attribution.
-isolation_keys = st.sampled_from(["a", "ab", "Ab", "b", "bc", "c "])
+isolation_keys = st.sampled_from(["a", "ab", "Ab", "b", "bc", "c", "c "])
 isolation_requests = st.lists(st.tuples(timestamps, isolation_keys), max_size=60)
 limits = st.integers(min_value=1, max_value=5)
 # Mostly ordinary windows, sometimes far outside the tested range, so an
