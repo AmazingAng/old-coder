@@ -168,12 +168,23 @@ MUTANTS = [
         "self._last_sweep = -math.inf",
         "self._last_sweep = 0.0",
     ),
+    # [REVISION 4f] The idle threshold's boundary was pinned but its magnitude
+    # was not: 1.5x and 1.99x both survived the entire gauntlet, inflating the
+    # approved two-window bound by up to 50%.
+    (
+        "M23 inflate the idle threshold 1.5x (retention bound silently grows)",
+        "if now - hits[-1] > self._window]\n",
+        "if now - hits[-1] > self._window * 1.5]\n",
+    ),
 ]
 
 
-# Negative control for the harness itself: two mutants of IDENTICAL size (each
-# one byte shorter than the original), a killer followed by a proven-equivalent
-# one. If bytecode caching ever leaks between runs again, the equivalent mutant
+# Negative control for the harness itself: two mutants of IDENTICAL size, a
+# killer followed by a proven-equivalent one. (Both are length-PRESERVING, so
+# all three files are the same size; an earlier version of this comment also
+# said "each one byte shorter than the original", which describes M4/M5, not
+# these. Only C1 == C2 matters for the collision.)
+# If bytecode caching ever leaks between runs again, the equivalent mutant
 # inherits the killer's result and is misreported as KILLED. Run with
 # --negative-control; run as a gate by tools/gauntlet.sh before the real
 # mutation pass. (It is NOT part of test_gauntlet_checks.sh, which covers

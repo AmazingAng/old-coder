@@ -1,4 +1,5 @@
-"""Scenario tests — each test name maps 1:1 to a spec.md scenario."""
+"""Scenario tests. Most map 1:1 to a spec.md scenario; the rest map to a
+Must NOT clause or to a failure-model row (24 tests, 22 scenarios)."""
 
 import math
 import sys
@@ -154,6 +155,21 @@ def test_sweep_keeps_a_key_whose_newest_hit_is_exactly_window_old(
     assert limiter.allow("k") is True
     clock.now = 61.0  # sweep fires; k's only hit is exactly 60s old
     assert limiter.allow("k") is False
+
+
+def test_a_key_is_dropped_by_the_first_sweep_after_one_idle_window(
+    clock: FakeClock,
+) -> None:
+    # _sweep's boundary was pinned (M18 kills >=) but its MAGNITUDE was not:
+    # `> window * 1.5` and even `* 1.99` left the whole gauntlet green while
+    # inflating the approved two-window bound to three. Every memory test
+    # asserted deletion only at age >= 2W, so any threshold in (W, 2W) passed.
+    limiter = RateLimiter(limit=5, window_seconds=60, clock=clock)
+    assert limiter.allow("armer") is True  # t=0, arms the sweep clock
+    assert limiter.allow("idle") is True  # t=0
+    clock.now = 61.0  # first sweep after t=0; idle is 61s old, one window+
+    assert limiter.allow("probe") is True
+    assert "idle" not in limiter._hits, "idle threshold is larger than a window"
 
 
 def test_the_memory_bound_is_two_windows_not_one(clock: FakeClock) -> None:
@@ -339,6 +355,9 @@ def test_clock_is_read_inside_the_critical_section() -> None:
     first.join(timeout=5)
     second.join(timeout=5)
     hits = list(limiter._hits["k"])
+    # Both assertions matter: a one-element list is trivially sorted, so a
+    # second caller that died would satisfy the ordering check vacuously.
+    assert len(hits) == 2, f"a caller never committed: {hits}"
     assert hits == sorted(hits), f"commits inverted, deque unsorted: {hits}"
 
 

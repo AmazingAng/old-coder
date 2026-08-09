@@ -200,10 +200,17 @@ Feature: Sliding-window rate limiting per key
   denied requests (denials store nothing)". Denials were never the leak;
   *allowed* requests from keys that never return were. Growth is bounded by
   the distinct keys seen in the TWO windows preceding the most recent
-  request — see the idle-keys scenario. The qualifier is load-bearing
+  request — see the idle-keys scenario. Precisely [REVISION 4f]: a key is
+  resident at an age of at most exactly 2W when any request is observed, and
+  the sweep that drops it runs strictly LATER than 2W after its last hit.
+  Earlier wording said "just under 2W", which is false in both readings —
+  2W is attained (armer t=0, idle t=40, probes at t=100 and t=160 leave idle
+  resident at age exactly 120.0). The qualifier below is load-bearing
   [REVISION 4e]: sweeping happens only inside `allow()`, so while traffic is
-  silent nothing is reclaimed at all. Measured: 1000 one-shot keys, clock
-  advanced by ~166,000 windows with no requests, still 1000 keys resident;
+  silent nothing is reclaimed at all. Measured with 1000 one-shot keys, clock
+  advanced by ~166,000 windows with no requests, still 1000 keys resident
+  (the scenario and its test use 50, which is the same behaviour at a size
+  that keeps the suite fast);
   the map drops to 1 only when the next request arrives. Peak resident set is
   not released until traffic resumes.
   REVISION 4d: this clause and the class docstring both said "one window" and
@@ -292,7 +299,7 @@ shown to fail is a defect, not a mapping.]
 | a caller's quota reset by the sweep at the exact boundary | sweep-boundary scenario; mutant M18 killed [4c] |
 | concurrent commits inverted against the clock read | clock-ordering scenario (gated clock forces two callers to read different values); mutant M16 killed. [4c: the lock covered check-and-append but not the clock read. Both earlier concurrency tests held time constant, so no test could tell the two placements apart] |
 | unbounded memory growth (any path) | idle-keys scenario + denials test; mutants M8/M12 killed |
-| concurrent callers racing on shared state | **fault injection**: the atomicity test constructs the interleaving and kills M13 deterministically. The threaded stress test corroborates statistically (measured 5.9% per-round detection, 400 rounds) but cannot be the sole catcher — at 60 rounds the lock-removal mutant was observed surviving 1 run in 50 |
+| concurrent callers racing on shared state | **fault injection**: the atomicity test constructs the interleaving and kills M13 deterministically. The threaded stress test corroborates statistically (per-round detection measured against the real source mutant at 3.7% on this machine — an earlier 5.9% came from a Python replica, not the mutant; 400 rounds puts the miss probability near 3e-7, and the rate is machine-dependent) but cannot be the sole catcher — at 60 rounds the lock-removal mutant was observed surviving 1 run in 50 |
 | the mutation layer reporting kills it never ran | **negative control**: a killer and a strictly-equivalent mutant of identical size under one pinned mtime. Non-vacuity measured three ways [4e]: removing the rmtree alone leaves it green, removing PYTHONDONTWRITEBYTECODE alone trips a RuntimeError tripwire, and removing both plus the tripwire produces the advertised misreport. The 4b wording credited the rmtree; DONTWRITEBYTECODE is what closes the leak |
 | the sweep degrading to an O(distinct keys) scan per request (availability) | throttle scenario + first-call scenario; mutants M19/M21/M22 killed [4e] |
 | backward skew suspending memory reclamation | backward-jump scenario; mutant M20 killed. [4e: the skew row above covers the quota side only — "fails closed" was true of quota and false of memory] |

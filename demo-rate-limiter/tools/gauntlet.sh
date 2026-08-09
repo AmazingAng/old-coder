@@ -27,9 +27,12 @@ echo "=== supply chain ==="
 "$PY/pip-audit" -r requirements-dev.txt
 echo "=== must-not scans ==="
 # Matches usage forms, not the word: `time\.` alone missed `from time import
-# sleep`. Deliberately not `[[:<:]]time`, which would fire on conftest's own
-# "No real time in tests" docstring and on test_non_monotonic_clock_* — the
-# fix belongs in the pattern, never in an exclusion.
+# sleep`. Deliberately not `[[:<:]]time`, which fires on conftest's own "No
+# real time in tests" docstring, on `timestamps`, on `timeout=` and on prose
+# like "hold time constant" — the fix belongs in the pattern, never in an
+# exclusion. (An earlier version of this comment also claimed it would fire on
+# test_non_monotonic_clock_*; that was invented — the name has no "time" in
+# it at all.)
 #
 # Scope is deliberately narrower than the Must NOT's ambition: it catches real
 # time being read or slept on, not every way a test could depend on wall
