@@ -8,6 +8,26 @@ from collections.abc import Callable
 __all__ = ["RateLimiter"]
 
 
+def _validate(limit: int, window_seconds: float) -> None:
+    """Reject any configuration that would silently never or always allow.
+
+    Extracted from __init__ so that adding the window_seconds type guard did
+    not push the constructor to the top of the complexity budget. `bool` is
+    excluded explicitly: it is a subclass of int, so True would otherwise be
+    accepted as a limit of 1 and a window of 1.0 second.
+    """
+    if isinstance(limit, bool) or not isinstance(limit, int):
+        raise ValueError(f"limit must be an integer, got {limit!r}")
+    if limit <= 0:
+        raise ValueError(f"limit must be positive, got {limit}")
+    if isinstance(window_seconds, bool) or not isinstance(window_seconds, int | float):
+        raise ValueError(f"window_seconds must be a number, got {window_seconds!r}")
+    if not math.isfinite(window_seconds) or window_seconds <= 0:
+        raise ValueError(
+            f"window_seconds must be positive and finite, got {window_seconds}"
+        )
+
+
 class RateLimiter:
     """Allow at most `limit` requests per key within any sliding window.
 
@@ -25,14 +45,7 @@ class RateLimiter:
     def __init__(
         self, limit: int, window_seconds: float, clock: Callable[[], float]
     ) -> None:
-        if isinstance(limit, bool) or not isinstance(limit, int):
-            raise ValueError(f"limit must be an integer, got {limit!r}")
-        if limit <= 0:
-            raise ValueError(f"limit must be positive, got {limit}")
-        if not math.isfinite(window_seconds) or window_seconds <= 0:
-            raise ValueError(
-                f"window_seconds must be positive and finite, got {window_seconds}"
-            )
+        _validate(limit, window_seconds)
         self._limit = limit
         self._window = window_seconds
         self._clock = clock
@@ -70,6 +83,4 @@ class RateLimiter:
         hits = self._hits.get(key, deque())
         while hits and now - hits[0] > self._window:
             hits.popleft()
-        if not hits:
-            self._hits.pop(key, None)
         return hits

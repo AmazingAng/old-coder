@@ -71,13 +71,31 @@ Feature: Sliding-window rate limiting per key
     Then ValueError is raised naming limit
     (limit=NaN made every comparison False and the limiter allowed forever —
     the same fail-open class fixed for window_seconds in REVISION 2026-07-25,
-    never swept across to the sibling parameter)
+    never swept across to the sibling parameter. limit=2.5 was not "silently
+    treated as 2": len(hits) >= 2.5 is false at 2, so it allowed 3.)
+
+  Scenario: window_seconds must be a number  [REVISION 4b]
+    When constructing with window_seconds = True, "60", or None
+    Then ValueError is raised naming window_seconds
+    (the sweep ran one way only: window_seconds=True built a 1.0-second
+    window, and "60" raised a bare TypeError from math.isfinite instead of
+    naming the parameter the invalid-construction scenario promises)
+
+  Scenario: keys are compared as exact strings  [REVISION 4b]
+    Given a limiter with limit 1 per 60 seconds
+    When "Alice" and "alice" each make a request
+    Then both are allowed — they are different callers
+    (every key elsewhere in the suite is lowercase, so any normalisation of
+    the key was structurally invisible to the whole gauntlet)
 
   Scenario: key must be a non-empty string  [REVISION 4]
     When calling allow() with None, an int, bytes, or ""
     Then TypeError (wrong type) or ValueError (empty) is raised
-    (a missing HTTP header arriving as None must not silently become one
-    shared quota bucket for every unidentified caller)
+    (CONTRACT HARDENING, not a reproduced fail-open: None as a key made every
+    unidentified caller share one bucket, which limits too strictly or lets
+    callers exhaust each other's quota — it never let anyone past the limit.
+    Approved as a deliberate tightening for an HTTP-facing API, and recorded
+    separately from the defects that were demonstrated.)
 
   Scenario: idle keys are forgotten — the key map is bounded  [REVISION 4]
     Given a limiter with limit 1 per 60 seconds
@@ -100,9 +118,19 @@ Feature: Sliding-window rate limiting per key
 
 ## Must NOT do
 
-- No real time.sleep / wall-clock dependence in tests. Covers every spelling
-  (`import time`, `from time import sleep`, aliases, `datetime`) — not one
-  regex's idea of it. [REVISION 4: the gate matched only `time.`]
+- The limiter under test is never driven by a real clock, and no test makes
+  time pass by sleeping. [REVISION 4, amended: the gate matched only `time.`
+  and missed `from time import sleep`. The wording here previously claimed to
+  cover "every spelling", which a regex cannot do — dynamic imports, renamed
+  helpers, and a caller's own `sleep()` all escape it. The gate blocks known
+  direct wall-clock imports and calls; that is its actual scope.]
+  **Declared exception**: the concurrency tests use `Event.wait(timeout=)` and
+  `Thread.join(timeout=)` as deadlock guards, and the atomicity test asserts
+  that a blocked thread is still alive after 0.2s. That last assertion is a
+  genuine wall-clock dependence, accepted deliberately: the alternative is a
+  concurrency test that can hang forever. It is one-sided — it can only fail
+  spuriously if a thread is starved for 0.2s — and no limiter in any test
+  reads a real clock.
 - No unbounded memory growth. [REVISION 4: this clause used to read "from
   denied requests (denials store nothing)". Denials were never the leak;
   *allowed* requests from keys that never return were. Growth is now bounded
@@ -118,26 +146,54 @@ obligation, stated here because the failure model previously implied the
 non-monotonic scenario covered skew in both directions. It covers backward
 skew only.
 
+`clock` MUST also return a finite number. [REVISION 4b] A NaN reading is
+recorded as a hit that can never expire by pruning — `now - nan > window` is
+always false — so it permanently consumes one slot of that key's quota until
+an idle window lets the sweep drop the key. The spec sweeps NaN out of
+`limit` and `window_seconds`; the third injection point is the clock itself,
+and it is a caller obligation rather than a check, because validating every
+reading would put a branch on the hot path for a fault `time.monotonic` cannot
+produce.
+
+## Accepted residual risk [REVISION 4b]
+
+The memory bound is **temporal, not cardinal**: keys idle for a window are
+forgotten, but nothing caps how many distinct keys appear *within* one window.
+An attacker who controls the key — which, per the stated deployment, is an IP
+or a request header — can still drive the map arbitrarily large inside a
+single window, and because the sweep is throttled to once per window the
+worst-case retention is closer to two windows than one. This is accepted, not
+overlooked: a cardinality cap needs an eviction policy (which caller gets
+forgotten?), and evicting a live key silently resets its quota — a fail-open
+worse than the memory it saves. Recorded here so the residual reads as
+accepted rather than absent, in the same register as the clock contract.
+
 ## Failure model (Tier 3)
 
 [REVISION 3, 2026-07-27: retrofitted — the skill now requires an explicit
 failure model before layer selection; these modes were previously implicit
 in the scenarios, Must NOTs, and adversarial pass.]
 
-[REVISION 4, 2026-08-09: an independent fresh-context verification pass found
-that three rows below claimed coverage they did not have. Every row now names
-a test AND a mutant that demonstrably fails without it; a row whose catcher
-cannot be shown to fail is a defect, not a mapping.]
+[REVISION 4, 2026-08-09, amended 4b: independent fresh-context verification
+found rows below claiming coverage they did not have. The standard is now:
+every covered mode must name and demonstrate an **appropriate falsification
+procedure** — a test, a mutant, fault injection, a benchmark, a rollback
+rehearsal, whatever actually fits the risk. Not "a test AND a mutant", which
+just breeds mutants written to fill a table. A row whose catcher cannot be
+shown to fail is a defect, not a mapping.]
 
-| How this can hurt | Layer that catches it |
+| How this can hurt | Falsification procedure, demonstrated |
 |---|---|
-| over-allowing in a burst (limit not enforced) | scenario tests + P1 + mutants M1/M5 |
-| under-allowing / fail-closed drift (quota lost) | boundary scenario + mutants M6/M8 (P1 is one-sided and cannot catch this). Verification proposed a third mutant here; it proved EQUIVALENT — see mutants.py |
-| hostile or invalid config silently accepted | validation scenarios (window AND limit) + adversarial pass + mutants M4/M7/M9 |
-| backward clock skew opening the gate | non-monotonic clock scenario (jump must exceed the window) + mutant M10 |
+| over-allowing in a burst (limit not enforced) | scenario tests + P1; mutants M1/M5 killed |
+| under-allowing / fail-closed drift (quota lost) | boundary scenario, demonstrated by killing M2. [4b: this row previously cited M6/M8 — M6 in fact **over**-allows, and M8 is killed by the memory row's tests. Verification also proposed a `while`→`if` mutant here; it proved EQUIVALENT, see mutants.py] |
+| hostile or invalid config silently accepted | validation scenarios for limit, window_seconds AND key + adversarial pass; mutants M4/M7/M9/M15 killed |
+| backward clock skew opening the gate | non-monotonic clock scenario, jump exceeding the window; mutant M10 killed |
 | forward clock skew resetting all quota | **not covered — caller obligation**; see Clock contract |
-| unbounded memory growth (any path) | idle-keys scenario + denials test + mutants M8/M12 |
-| concurrent callers racing on shared state | concurrency scenario + mutant M13 (lock removed) |
+| a non-finite clock reading freezing a hit in the window | **not covered — caller obligation**; see Clock contract [4b] |
+| caller identity silently merged (key normalisation) | exact-strings scenario; mutant M14 killed [4b] |
+| unbounded memory growth (any path) | idle-keys scenario + denials test; mutants M8/M12 killed |
+| concurrent callers racing on shared state | **fault injection**: the atomicity test constructs the interleaving and kills M13 deterministically. The threaded stress test corroborates statistically (measured 5.9% per-round detection, 400 rounds) but cannot be the sole catcher — at 60 rounds the lock-removal mutant was observed surviving 1 run in 50 |
+| the mutation layer reporting kills it never ran | **negative control**: a killer and a strictly-equivalent mutant of identical size under one pinned mtime; proven non-vacuous by removing the cache defence and watching the control go red [4b] |
 | untested code reaching production | coverage layer, now a gate (`--cov-fail-under=100`) — it previously printed a number and could not fail |
 | silent failure in production | n-a: library returns a bool the caller observes directly |
 
