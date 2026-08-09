@@ -175,6 +175,30 @@ def test_the_memory_bound_is_two_windows_not_one(clock: FakeClock) -> None:
     assert "idle" not in limiter._hits, "two windows must be the bound"
 
 
+def test_the_first_call_always_sweeps(clock: FakeClock) -> None:
+    # The -inf sentinel exists so the first call is never throttled. Every
+    # other clock in the suite starts at 0.0 or past a full window, so a
+    # sentinel of 0.0 would have been indistinguishable.
+    limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
+    clock.now = 30.0
+    assert limiter.allow("k") is True
+    assert limiter._last_sweep == 30.0, "first call did not sweep"
+
+
+def test_memory_is_not_reclaimed_while_traffic_is_silent(clock: FakeClock) -> None:
+    # The sweep runs only inside allow(), so the bound is "keys seen in the two
+    # windows preceding the most recent request" — not two windows of wall
+    # time. Every other memory test probes after issuing a request, which is
+    # exactly the case the lazy sweep handles.
+    limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
+    for i in range(50):
+        assert limiter.allow(f"k{i}") is True
+    clock.now = 10_000_000.0  # ~166,000 windows pass with no traffic
+    assert len(limiter._hits) == 50, "nothing is reclaimed without a request"
+    assert limiter.allow("probe") is True
+    assert len(limiter._hits) == 1
+
+
 def test_backward_clock_skew_does_not_suspend_the_sweep(clock: FakeClock) -> None:
     # The throttle compares now against the last sweep time. After a backward
     # jump, now stays below it and the sweep never runs again until the clock
@@ -201,6 +225,9 @@ def test_the_sweep_is_throttled_to_once_per_window(clock: FakeClock) -> None:
     clock.now = 30.0
     assert limiter.allow("k") is True
     assert limiter._last_sweep == 0.0, "swept again inside the same window"
+    clock.now = 60.0  # delta is exactly one window: still throttled
+    assert limiter.allow("k") is True
+    assert limiter._last_sweep == 0.0, "swept at the boundary; <= means <="
     clock.now = 61.0
     assert limiter.allow("k") is True
     assert limiter._last_sweep == 61.0, "did not sweep after a full window"

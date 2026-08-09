@@ -23,11 +23,14 @@ PYTEST = ROOT / ".venv/bin/pytest"
 # original and adjacent in the list, so M5 -- the fail-open mutant -- was
 # reported KILLED on the strength of M4's code. The bias is toward inflating
 # the kill count, which can never surface as a red gauntlet. Both defences are
-# needed, but not symmetrically. DONTWRITEBYTECODE alone leaves the negative
-# control green: with no .pyc written during the run, a stale one can only be
-# the pristine pre-run file, which biases toward a false SURVIVED — a red
-# gauntlet, not a silent inflation. Removing it is caught by a separate
-# tripwire below. The rmtree is what closes the between-mutants leak.
+# needed only as a belt-and-braces pair, and an earlier version of this
+# comment had the roles backwards. Measured three ways: removing the rmtree
+# alone leaves the control green; removing DONTWRITEBYTECODE alone trips the
+# tripwire below with a RuntimeError; only removing both AND the tripwire
+# reproduces the misreport. DONTWRITEBYTECODE is what actually closes the
+# leak — with no .pyc written during a run there is nothing to inherit — and
+# gauntlet.sh clears __pycache__ before the layer starts anyway. The rmtree
+# covers the case of running this script directly on a dirty tree.
 MUTANT_ENV = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
 
 MUTANTS = [
@@ -151,6 +154,20 @@ MUTANTS = [
         "if 0 <= now - self._last_sweep <= self._window:",
         "if now - self._last_sweep <= self._window:",
     ),
+    # [REVISION 4e] The throttle's own boundary was the last age comparison in
+    # the file with no test behind it -- _prune's had M2, _sweep's had M18.
+    # The sentinel had the same shape: every clock in the suite starts at 0.0
+    # or beyond a window, so its purpose was structurally invisible.
+    (
+        "M21 sweep-throttle boundary <= to < (sweeps early, delays cleanup)",
+        "if 0 <= now - self._last_sweep <= self._window:",
+        "if 0 <= now - self._last_sweep < self._window:",
+    ),
+    (
+        "M22 sweep sentinel -inf to 0.0 (first call skips its sweep)",
+        "self._last_sweep = -math.inf",
+        "self._last_sweep = 0.0",
+    ),
 ]
 
 
@@ -158,7 +175,9 @@ MUTANTS = [
 # one byte shorter than the original), a killer followed by a proven-equivalent
 # one. If bytecode caching ever leaks between runs again, the equivalent mutant
 # inherits the killer's result and is misreported as KILLED. Run with
-# --negative-control; exercised by tools/test_gauntlet_checks.sh.
+# --negative-control; run as a gate by tools/gauntlet.sh before the real
+# mutation pass. (It is NOT part of test_gauntlet_checks.sh, which covers
+# must_not_match only — an earlier comment here claimed otherwise.)
 # Both mutations are length-preserving, so the two mutated files are the same
 # size; with a pinned mtime the (mtime, size) collision is constructed, not
 # waited for. C2 must be STRICTLY equivalent: `or` over two side-effect-free

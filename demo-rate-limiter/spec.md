@@ -125,6 +125,43 @@ Feature: Sliding-window rate limiting per key
     When any request arrives after a full window has elapsed
     Then the limiter retains only keys with a hit inside the current window
 
+  Scenario: the key map is bounded by two windows, not one  [REVISION 4e]
+    Given a limiter with limit 5 per 60 seconds
+    And "armer" at t=0 and "idle" at t=1, then a request at t=60.9
+    When a request arrives at t=100 — "idle" has been idle for 99s
+    Then "idle" is still retained; only at t=121 is it forgotten
+    (the sweep is throttled to once per window, so worst-case retention is
+    just under 2W. The old idle-keys test probed at exactly 2W and so passed
+    under either reading, pinning neither.)
+
+  Scenario: nothing is reclaimed while traffic is silent  [REVISION 4e]
+    Given 50 one-shot keys at t=0
+    When the clock advances by ~166,000 windows and no request is made
+    Then all 50 are still resident; the map shrinks only on the next request
+    (sweeping happens inside allow(), so the bound is "keys seen in the two
+    windows preceding the most recent request", not two windows of wall time)
+
+  Scenario: the sweep is throttled to at most once per window  [REVISION 4e]
+    Given a limiter with limit 5 per 60 seconds and a request at t=0
+    When further requests arrive at t=30 and at t=60 (delta exactly one window)
+    Then no further sweep has run; the sweep at t=61 does run
+    (the throttle carries the accepted-residual-risk argument, and its own
+    boundary was the last age comparison in the file with no test behind it)
+
+  Scenario: the first call always sweeps  [REVISION 4e]
+    Given a fresh limiter with a 60-second window
+    When the very first request arrives at t=30
+    Then a sweep has run
+    (the -inf sentinel exists for exactly this; every other clock in the suite
+    starts at 0.0 or beyond a window, so a 0.0 sentinel was indistinguishable)
+
+  Scenario: a backward clock jump does not suspend reclamation  [REVISION 4e]
+    Given a limiter armed at t=1,000,000
+    When the clock jumps back to 0 and 200 one-shot keys arrive over 400s
+    Then the sweep still runs and the map does not grow without bound
+    (a one-sided throttle left `now` permanently below the last sweep time —
+    measured 20,001 keys retained across seven windows of monotone time)
+
   Scenario: concurrent callers never exceed the limit  [REVISION 4]
     Given a limiter with limit 1 per 60 seconds
     When many threads call allow() for the same key simultaneously
@@ -162,7 +199,13 @@ Feature: Sliding-window rate limiting per key
 - No unbounded memory growth. [REVISION 4: this clause used to read "from
   denied requests (denials store nothing)". Denials were never the leak;
   *allowed* requests from keys that never return were. Growth is bounded by
-  the distinct keys seen within TWO windows — see the idle-keys scenario.
+  the distinct keys seen in the TWO windows preceding the most recent
+  request — see the idle-keys scenario. The qualifier is load-bearing
+  [REVISION 4e]: sweeping happens only inside `allow()`, so while traffic is
+  silent nothing is reclaimed at all. Measured: 1000 one-shot keys, clock
+  advanced by ~166,000 windows with no requests, still 1000 keys resident;
+  the map drops to 1 only when the next request arrives. Peak resident set is
+  not released until traffic resumes.
   REVISION 4d: this clause and the class docstring both said "one window" and
   were literally false. Because the sweep is throttled to once per window, a
   key can sit idle for just under 2W before the sweep that drops it runs. Only
@@ -189,11 +232,16 @@ temporal memory bound for NaN-poisoned keys**, which is stated here rather
 than left to be inferred. The third NaN injection point is the clock itself,
 and it stays a caller obligation rather than a check because validating every
 reading puts a branch on the hot path for a fault `time.monotonic` cannot
-produce. [4d] A NaN reading also destroys the sweep throttle permanently:
-`_last_sweep` becomes NaN, every subsequent comparison against it is false,
-and the sweep then runs an O(distinct keys) scan on every request for the
-life of the process. The 4c paragraph described the never-expiring hit as if
-that were the whole mode; it is not.
+produce. [4d, corrected in 4e] A NaN reading also disturbs the sweep
+throttle, but NOT permanently: `_last_sweep` becomes NaN and every comparison
+against it is false, so the very next request sweeps — and that sweep
+unconditionally re-anchors `_last_sweep` to a finite value, after which the
+throttle behaves normally. Measured: nan, then 100.0 at t=100, still 100.0 at
+t=101/102/110. The total cost of one NaN reading is **one extra sweep**. The
+4d text claimed an unbounded per-request scan "for the life of the process";
+that was false, and it was written by the revision that fixed the previous
+inaccuracy in this same paragraph. (A clock stuck at NaN forever is a
+different matter and is not what that sentence described.)
 
 `clock` is the only constructor parameter with no validation. That is
 deliberate — a non-callable clock raises TypeError at the first `allow()`,
@@ -245,7 +293,9 @@ shown to fail is a defect, not a mapping.]
 | concurrent commits inverted against the clock read | clock-ordering scenario (gated clock forces two callers to read different values); mutant M16 killed. [4c: the lock covered check-and-append but not the clock read. Both earlier concurrency tests held time constant, so no test could tell the two placements apart] |
 | unbounded memory growth (any path) | idle-keys scenario + denials test; mutants M8/M12 killed |
 | concurrent callers racing on shared state | **fault injection**: the atomicity test constructs the interleaving and kills M13 deterministically. The threaded stress test corroborates statistically (measured 5.9% per-round detection, 400 rounds) but cannot be the sole catcher — at 60 rounds the lock-removal mutant was observed surviving 1 run in 50 |
-| the mutation layer reporting kills it never ran | **negative control**: a killer and a strictly-equivalent mutant of identical size under one pinned mtime; proven non-vacuous by removing the cache defence and watching the control go red [4b] |
+| the mutation layer reporting kills it never ran | **negative control**: a killer and a strictly-equivalent mutant of identical size under one pinned mtime. Non-vacuity measured three ways [4e]: removing the rmtree alone leaves it green, removing PYTHONDONTWRITEBYTECODE alone trips a RuntimeError tripwire, and removing both plus the tripwire produces the advertised misreport. The 4b wording credited the rmtree; DONTWRITEBYTECODE is what closes the leak |
+| the sweep degrading to an O(distinct keys) scan per request (availability) | throttle scenario + first-call scenario; mutants M19/M21/M22 killed [4e] |
+| backward skew suspending memory reclamation | backward-jump scenario; mutant M20 killed. [4e: the skew row above covers the quota side only — "fails closed" was true of quota and false of memory] |
 | untested code reaching production | coverage layer, now a gate (`--cov-fail-under=100`) — it previously printed a number and could not fail |
 | silent failure in production | n-a: library returns a bool the caller observes directly |
 
