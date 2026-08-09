@@ -1,6 +1,9 @@
 """Scenario tests — each test name maps 1:1 to a spec.md scenario."""
 
 import math
+import sys
+import threading
+from typing import Any
 
 import pytest
 from conftest import FakeClock
@@ -91,5 +94,72 @@ def test_non_monotonic_clock_does_not_grant_extra_quota(clock: FakeClock) -> Non
     limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
     clock.now = 100.0
     assert limiter.allow("k") is True
-    clock.now = 50.0  # clock jumps backward
+    # The jump must exceed window_seconds: a smaller one leaves the hit inside
+    # the window anyway, so it cannot distinguish an age of `now - hit` from
+    # `abs(now - hit)` — the fail-open form. [REVISION 4]
+    clock.now = 0.0  # backward by 100s, window is 60s
     assert limiter.allow("k") is False  # must fail closed
+
+
+@pytest.mark.parametrize("limit", [math.nan, math.inf, -math.inf, 2.5, True])
+def test_limit_must_be_a_finite_positive_integer(clock: FakeClock, limit: Any) -> None:
+    with pytest.raises(ValueError, match="limit"):
+        RateLimiter(limit=limit, window_seconds=60, clock=clock)
+
+
+@pytest.mark.parametrize(
+    ("key", "expected"),
+    [(None, TypeError), (12345, TypeError), (b"bytes", TypeError), ("", ValueError)],
+)
+def test_key_must_be_a_non_empty_string(
+    clock: FakeClock, key: Any, expected: type[Exception]
+) -> None:
+    limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
+    with pytest.raises(expected, match="key"):
+        limiter.allow(key)
+
+
+def test_idle_keys_are_forgotten_key_map_is_bounded(clock: FakeClock) -> None:
+    limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
+    for i in range(1000):
+        assert limiter.allow(f"one-shot-{i}") is True
+    assert len(limiter._hits) == 1000
+    clock.now = 121.0  # a full window has elapsed and none of them came back
+    assert limiter.allow("someone-else") is True
+    assert len(limiter._hits) == 1
+
+
+def _allowed_in_one_race(limiter: RateLimiter, threads: int) -> int:
+    """Fire `threads` simultaneous allow() calls; return how many won."""
+    barrier = threading.Barrier(threads)
+    results: list[bool] = []
+    guard = threading.Lock()
+
+    def worker() -> None:
+        barrier.wait()
+        got = limiter.allow("k")
+        with guard:
+            results.append(got)
+
+    workers = [threading.Thread(target=worker) for _ in range(threads)]
+    for w in workers:
+        w.start()
+    for w in workers:
+        w.join()
+    return sum(results)
+
+
+def test_concurrent_callers_never_exceed_the_limit() -> None:
+    rounds, threads = 60, 16
+    previous_interval = sys.getswitchinterval()
+    sys.setswitchinterval(1e-6)  # widen the preemption window
+    try:
+        worst = max(
+            _allowed_in_one_race(
+                RateLimiter(limit=1, window_seconds=60, clock=lambda: 0.0), threads
+            )
+            for _ in range(rounds)
+        )
+    finally:
+        sys.setswitchinterval(previous_interval)
+    assert worst == 1

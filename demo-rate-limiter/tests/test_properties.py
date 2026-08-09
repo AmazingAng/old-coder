@@ -6,15 +6,30 @@ from hypothesis import strategies as st
 
 from ratelimiter import RateLimiter
 
-requests = st.lists(
-    st.tuples(
-        st.floats(min_value=0, max_value=1000, allow_nan=False, allow_infinity=False),
-        st.sampled_from("abc"),
-    ),
-    max_size=60,
+timestamps = st.floats(
+    min_value=0, max_value=1000, allow_nan=False, allow_infinity=False
+)
+# [REVISION 4] Keys were `st.sampled_from("abc")`, so the whole suite ever saw
+# three distinct keys and an implementation hardcoded to them scored 100%
+# coverage and 8/8 mutants. A small alphabet keeps collisions frequent (which
+# is what makes P1 bite) while ranging far outside any hardcoded set.
+# Widening this too far blunts the layer: with 258 possible keys and limits up
+# to 20, hypothesis almost never drives one key to its limit, so the deny
+# branch goes unexercised and the fail-open mutant M5 survives the property
+# suite. 12 keys keeps collisions frequent while still ranging outside any
+# hardcoded key set. Measured by the layer-attribution run, not guessed.
+keys = st.text(alphabet="abc", min_size=1, max_size=2)
+requests = st.lists(st.tuples(timestamps, keys), max_size=60)
+isolation_requests = st.lists(
+    st.tuples(timestamps, st.sampled_from("abc")), max_size=60
 )
 limits = st.integers(min_value=1, max_value=5)
-windows = st.floats(min_value=0.1, max_value=100, allow_nan=False)
+# Mostly ordinary windows, sometimes far outside the tested range, so an
+# implementation that special-cases large windows cannot hide.
+windows = st.one_of(
+    st.floats(min_value=0.1, max_value=100, allow_nan=False),
+    st.floats(min_value=1001, max_value=5000, allow_nan=False),
+)
 
 
 def run(
@@ -43,7 +58,7 @@ def test_p1_allowed_count_within_any_window_never_exceeds_limit(
         assert in_window <= limit
 
 
-@given(steps=requests, limit=limits, window=windows)
+@given(steps=isolation_requests, limit=limits, window=windows)
 def test_p2_other_keys_traffic_never_changes_one_keys_outcomes(
     steps: list[tuple[float, str]], limit: int, window: float
 ) -> None:

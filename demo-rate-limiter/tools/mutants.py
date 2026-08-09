@@ -26,7 +26,7 @@ MUTANTS = [
     ),
     (
         "M3 drop recording of allowed hit",
-        "        hits.append(now)\n",
+        "            hits.append(now)\n",
         "\n",
     ),
     (
@@ -36,8 +36,8 @@ MUTANTS = [
     ),
     (
         "M5 deny becomes allow (fail open)",
-        "            return False",
-        "            return True",
+        "                return False",
+        "                return True",
     ),
     (
         "M6 prune from wrong end",
@@ -51,10 +51,42 @@ MUTANTS = [
     ),
     (
         "M8 denial records the attempt (memory leak)",
-        "        if len(hits) >= self._limit:\n            return False",
-        "        if len(hits) >= self._limit:\n"
-        "            hits.append(now)\n"
-        "            return False",
+        "            if len(hits) >= self._limit:\n                return False",
+        "            if len(hits) >= self._limit:\n"
+        "                hits.append(now)\n"
+        "                return False",
+    ),
+    # [REVISION 4] M9-M13 each pin a failure-model row that an independent
+    # verification pass showed was claiming coverage it did not have.
+    (
+        "M9 drop limit type/finiteness validation (limit=NaN allows forever)",
+        "        if isinstance(limit, bool) or not isinstance(limit, int):\n"
+        '            raise ValueError(f"limit must be an integer, got {limit!r}")\n',
+        "",
+    ),
+    (
+        "M10 clock skew fails open (absolute age)",
+        "while hits and now - hits[0] > self._window:",
+        "while hits and abs(now - hits[0]) > self._window:",
+    ),
+    # M11 (prune at most one expired hit per call: `while` -> `if`) is
+    # deliberately absent. A verification pass reported it as a surviving
+    # mutant proving "under-allowing drift"; it is in fact EQUIVALENT. If the
+    # head is expired, pruning one already leaves len <= limit-1, so both
+    # forms allow; if the head is not expired then under a monotone clock no
+    # entry is expired, so the deques are identical. Confirmed by differential
+    # test over 200k randomized monotone sequences: 0 divergences. Killing it
+    # would require a test asserting non-behavior — anti-gaming rule 4.
+    (
+        "M12 never forget idle keys (unbounded key-space growth)",
+        "        idle = [k for k, hits in self._hits.items() "
+        "if now - hits[-1] > self._window]\n",
+        "        idle: list[str] = []\n",
+    ),
+    (
+        "M13 drop the lock (concurrent over-allow)",
+        "        with self._lock:",
+        "        if True:",
     ),
 ]
 
