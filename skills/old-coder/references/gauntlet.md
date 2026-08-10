@@ -197,7 +197,9 @@ scenario so the evidence report's spec→test mapping is mechanical.
 - Toolchain: <pinned versions file, e.g. requirements-dev.txt>
 - Entry point: <single command that reruns every layer>
 - Independent verification: <not performed | passed | failed | blocked>
-  (Tier 3; protocol and full template in `verifier.md`)
+  **against the final source state** — a state no verifier saw is
+  `not performed` however many rounds preceded it (Tier 3; protocol in
+  `verifier.md`)
 
 ### Spec → Test mapping
 Status is one of: **pass / fail / unverified / n-a**. A row mapped to
@@ -224,7 +226,9 @@ Status is one of: **pass / fail / unverified / n-a**. A row mapped to
 ### Independent verification (never omit; see verifier.md)
 - Verifier: <host / model family>; fresh context; which inputs it received;
   what correlation that breaks and what it does not.
-- Rounds: <n> (cap <m>); verdict per round.
+- Rounds: <n> (cap <m>); verdict per round, each against the state it saw.
+- Grading: who classified each finding behavioural vs description, and who
+  approved stopping.
 - Attacked: <what was tried, not only what was found>.
 - Findings: behavioural (fixed, then re-verified in a new context) vs
   description/mapping (fixed and disclosed, no new round).
