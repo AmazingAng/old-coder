@@ -7,7 +7,7 @@
 - Independent verification: **six fresh-context rounds**, the last against
   commit `d0b506c`. See "Independent verification" below — including what the
   final round found and what was deliberately left unfixed.
-- Source state: git commit `66df5cd`; sha256 tree hash `402ed5f682f8543f` —
+- Source state: git commit `8b88bda`; sha256 tree hash `c80e8cccf0a1ed3a` —
   reproduce both with `./tools/source_state.sh` (works from any directory;
   now includes `.github/workflows`, which decides whether the gauntlet runs
   in CI at all).
@@ -17,6 +17,12 @@
 
 All numbers are from one final fresh run of the entry point, executed
 2026-08-10 after the last code edit.
+
+`spec.md` was deliberately pruned back to a contract afterwards (339 → 255
+lines). Every clause, invariant, obligation and failure-model row survives;
+what was removed is the per-revision forensics, which lives in the honest
+notes below and in git. The spec is the artifact a human reads before any
+code exists, and it had stopped being readable as one.
 
 ## Spec → Test mapping
 
