@@ -122,19 +122,16 @@ def test_key_must_be_a_non_empty_string(
 
 @pytest.mark.parametrize("window", [True, "60", None])
 def test_window_seconds_must_be_a_number(clock: FakeClock, window: Any) -> None:
-    # The 2026-07-25 NaN sweep ran on window_seconds and the REVISION 4 sweep
-    # ran on limit and key; window_seconds never got a type guard, so
-    # window_seconds=True built a 1.0-second window and "60" raised a bare
-    # TypeError from math.isfinite instead of naming the parameter.
+    # bool is an int subclass, so window_seconds=True would build a 1.0-second
+    # window; "60" would raise a bare TypeError instead of naming the parameter.
     with pytest.raises(ValueError, match="window_seconds"):
         RateLimiter(limit=1, window_seconds=window, clock=clock)
 
 
 def test_keys_are_compared_as_exact_strings(clock: FakeClock) -> None:
-    # Every key anywhere else in the suite is lowercase and unpadded, so any
-    # normalisation of the key was structurally invisible. Case-folding was
-    # pinned first; trimming survived that fix, so padding is pinned too, and
-    # a whitespace-only key is a valid distinct caller by the same rule.
+    # Every key elsewhere in the suite is lowercase and unpadded, so key
+    # normalisation is otherwise structurally invisible. Case, padding and a
+    # whitespace-only key are all pinned: the contract is "non-empty str".
     limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
     assert limiter.allow("Alice") is True
     assert limiter.allow("alice") is True  # a different caller, not the same one
@@ -146,9 +143,8 @@ def test_keys_are_compared_as_exact_strings(clock: FakeClock) -> None:
 def test_sweep_keeps_a_key_whose_newest_hit_is_exactly_window_old(
     clock: FakeClock,
 ) -> None:
-    # The boundary scenario above pins _prune's comparison; _sweep re-implements
-    # the same age test and nothing pinned it, so a >= there silently forgot a
-    # key that still had a live hit and reset that caller's quota.
+    # _sweep re-implements _prune's age comparison, so it needs its own
+    # boundary test: a >= there forgets a key that still has a live hit.
     limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
     assert limiter.allow("other") is True  # t=0, arms the sweep clock
     clock.now = 1.0
@@ -160,10 +156,9 @@ def test_sweep_keeps_a_key_whose_newest_hit_is_exactly_window_old(
 def test_a_key_is_dropped_by_the_first_sweep_after_one_idle_window(
     clock: FakeClock,
 ) -> None:
-    # _sweep's boundary was pinned (M18 kills >=) but its MAGNITUDE was not:
-    # `> window * 1.5` and even `* 1.99` left the whole gauntlet green while
-    # inflating the approved two-window bound to three. Every memory test
-    # asserted deletion only at age >= 2W, so any threshold in (W, 2W) passed.
+    # Pins the idle threshold's MAGNITUDE, not just its boundary: every other
+    # memory test asserts deletion only at age >= 2W, so any threshold in
+    # (W, 2W) satisfies them all.
     limiter = RateLimiter(limit=5, window_seconds=60, clock=clock)
     assert limiter.allow("armer") is True  # t=0, arms the sweep clock
     assert limiter.allow("idle") is True  # t=0
@@ -173,10 +168,8 @@ def test_a_key_is_dropped_by_the_first_sweep_after_one_idle_window(
 
 
 def test_the_memory_bound_is_two_windows_not_one(clock: FakeClock) -> None:
-    # The docstring and the Must NOT both said "one window" and were literally
-    # false: because the sweep is throttled, a key can stay idle for nearly two
-    # windows. The old idle-keys test probed at 2x the window, so it passed
-    # under either reading and pinned neither. This pins both sides.
+    # The throttle means residency reaches 2W. Pins both sides, so a bound of
+    # one window and a bound of three are each rejected.
     limiter = RateLimiter(limit=5, window_seconds=60, clock=clock)
     assert limiter.allow("armer") is True  # t=0, arms the sweep clock
     clock.now = 1.0
@@ -216,11 +209,9 @@ def test_memory_is_not_reclaimed_while_traffic_is_silent(clock: FakeClock) -> No
 
 
 def test_backward_clock_skew_does_not_suspend_the_sweep(clock: FakeClock) -> None:
-    # The throttle compares now against the last sweep time. After a backward
-    # jump, now stays below it and the sweep never runs again until the clock
-    # catches up — measured 20,001 keys retained across seven windows of
-    # monotone time. The quota side fails closed under skew; the memory side
-    # did not, and no test looked at len(_hits) after a jump.
+    # A one-sided throttle leaves `now` permanently below the last sweep time
+    # after a backward jump, suspending reclamation entirely. Quota fails
+    # closed under skew; memory has to be checked separately.
     limiter = RateLimiter(limit=1, window_seconds=60, clock=clock)
     clock.now = 1_000_000.0
     assert limiter.allow("arm") is True
@@ -232,9 +223,9 @@ def test_backward_clock_skew_does_not_suspend_the_sweep(clock: FakeClock) -> Non
 
 
 def test_the_sweep_is_throttled_to_once_per_window(clock: FakeClock) -> None:
-    # "at most once per window" carries the accepted-residual-risk argument,
-    # but nothing pinned it: deleting the throttle bookkeeping made the sweep
-    # run an O(keys) scan on every request and the whole suite stayed green.
+    # The throttle carries the accepted-residual-risk argument, so it needs a
+    # catcher of its own: without one, the sweep degrades to an O(keys) scan
+    # on every request invisibly.
     limiter = RateLimiter(limit=5, window_seconds=60, clock=clock)
     assert limiter.allow("k") is True
     assert limiter._last_sweep == 0.0

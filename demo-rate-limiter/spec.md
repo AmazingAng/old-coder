@@ -4,6 +4,15 @@ A library class `RateLimiter(limit, window_seconds, clock)` answering
 `allow(key) -> bool`: at most `limit` allowed requests per `key` within any
 sliding `window_seconds` interval. `clock` is an injected callable returning
 current time in seconds (the mock boundary — no real sleeping in tests).
+Intended deployment: in front of a public HTTP API, so callers are untrusted
+and the key space is attacker-controlled.
+
+This document is the contract. How each clause was arrived at — including the
+defects that six rounds of independent verification found and the two that a
+fix round introduced — is in `evidence.md`'s honest notes and in git history,
+deliberately not here.
+
+## Behaviour
 
 ```gherkin
 Feature: Sliding-window rate limiting per key
@@ -14,326 +23,233 @@ Feature: Sliding-window rate limiting per key
     Then all 3 return True
 
   Scenario: request over the limit is denied
-    Given a limiter with limit 3 per 60 seconds
-    And a key made 3 allowed requests at t=0
+    Given a limiter with limit 3 per 60 seconds and 3 allowed requests at t=0
     When the key makes a 4th request at t=59
     Then it returns False
 
   Scenario: denied requests do not consume quota
     Given a limiter with limit 1 per 60 seconds
-    And a key made 1 allowed request at t=0 and 5 denied requests at t=10
+    And 1 allowed request at t=0 and 5 denied requests at t=10
     When the window expires at t=61
     Then the next request returns True
-    (denials at t=10 must not have extended or refilled anything)
 
   Scenario: window slides — old requests expire individually
-    Given a limiter with limit 2 per 10 seconds
-    And allowed requests at t=0 and t=5
+    Given a limiter with limit 2 per 10 seconds and requests at t=0 and t=5
     When the key requests at t=10.1
     Then it returns True   # the t=0 request left the window
     When the key requests at t=10.2
-    Then it returns False  # t=5 and t=10.1 still inside
+    Then it returns False  # t=5 and t=10.1 are still inside
 
   Scenario: keys are isolated
-    Given a limiter with limit 1 per 60 seconds
-    And key "a" has exhausted its quota at t=0
+    Given a limiter with limit 1 per 60 seconds and key "a" exhausted at t=0
     When key "b" requests at t=0
     Then it returns True
 
-  Scenario: invalid construction is rejected
-    When constructing with limit 0, or a negative limit, or window_seconds <= 0
-    Then ValueError is raised naming the bad parameter
-    (a limiter that silently never/always allows is a security bug)
-
-  Scenario: non-finite window is rejected  [REVISION 2026-07-25: found by the
-    adversarial pass — NaN slipped through the "<= 0" check and produced a
-    window that never slides; inf silently disables expiry]
-    When constructing with window_seconds = NaN or +/-inf
-    Then ValueError is raised naming window_seconds
-
   Scenario: request at the exact window boundary is still limited
-    [REVISION 2026-07-27: mutant M2's kill turned out to depend on hypothesis
-    randomly hitting the exact boundary — no deterministic test covered it]
-    Given a limiter with limit 1 per 60 seconds
-    And an allowed request at t=0
+    Given a limiter with limit 1 per 60 seconds and an allowed request at t=0
     When the key requests at exactly t=60
     Then it returns False  # a hit expires only when its age EXCEEDS the window
 
   Scenario: non-monotonic clock does not grant extra quota
-    Given a limiter with limit 1 per 60 seconds
-    And an allowed request at t=100
-    When the clock jumps backward and the key requests at t=50
-    Then it returns False
-    (clock skew must fail closed, never open)
+    Given a limiter with limit 1 per 60 seconds and a request at t=100
+    When the clock jumps backward by more than the window and the key requests
+    Then it returns False  # skew must fail closed, never open
 
-  Scenario: limit must be a finite positive integer  [REVISION 4]
+  Scenario: invalid construction is rejected
+    When constructing with limit 0, a negative limit, or window_seconds <= 0
+    Then ValueError is raised naming the bad parameter
+    (a limiter that silently never or always allows is a security bug)
+
+  Scenario: limit must be a finite positive integer
     When constructing with limit = NaN, +/-inf, a float such as 2.5, or a bool
     Then ValueError is raised naming limit
-    (limit=NaN made every comparison False and the limiter allowed forever —
-    the same fail-open class fixed for window_seconds in REVISION 2026-07-25,
-    never swept across to the sibling parameter. limit=2.5 was not "silently
-    treated as 2": len(hits) >= 2.5 is false at 2, so it allowed 3.)
+    (every comparison against NaN is false, so the limiter allowed forever)
 
-  Scenario: window_seconds must be a number  [REVISION 4b]
-    When constructing with window_seconds = True, "60", or None
+  Scenario: window_seconds must be a positive finite number
+    When constructing with window_seconds = NaN, +/-inf, True, "60", or None
     Then ValueError is raised naming window_seconds
-    (the sweep ran one way only: window_seconds=True built a 1.0-second
-    window, and "60" raised a bare TypeError from math.isfinite instead of
-    naming the parameter the invalid-construction scenario promises)
 
-  Scenario: keys are compared as exact strings  [REVISION 4b, widened in 4c]
+  Scenario: key must be a non-empty string
+    When calling allow() with None, an int, bytes, or ""
+    Then TypeError (wrong type) or ValueError (empty) is raised
+    (a missing HTTP header arriving as None must not become one shared bucket
+    for every unidentified caller)
+
+  Scenario: keys are compared as exact strings
     Given a limiter with limit 1 per 60 seconds
     When "Alice", "alice", "alice " and " " each make a request
     Then all are allowed — they are four different callers
-    (every key elsewhere in the suite was lowercase and unpadded, so key
-    normalisation was structurally invisible. Case was pinned in 4b and
-    trimming still survived it, so padding is pinned too. A whitespace-only
-    key is a valid caller by the same rule: the contract is "non-empty str",
-    and deciding that " " is not a real caller is the caller's business.)
 
-  Scenario: the sweep keeps a key whose newest hit is exactly one window old
-    [REVISION 4c]
-    Given a limiter with limit 1 per 60 seconds
-    And another key's request at t=0 that arms the sweep, and "k" at t=1
-    When any request arrives at t=61, firing the sweep
-    Then "k" is still limited — its hit is exactly 60s old, not older
-    (the exact-boundary scenario pins _prune's comparison; _sweep re-implements
-    the same age test and nothing pinned it, so a >= there forgot a key that
-    still had a live hit and reset that caller's quota)
-
-  Scenario: concurrent commits never invert against the clock read
-    [REVISION 4c]
-    Given two callers whose clock reads are forced to return different values
-    When the caller that read the earlier value commits second
-    Then the recorded hits are still in ascending order
-    (both _prune and _sweep assume that order; the lock originally covered
-    check-and-append but not the clock read, and every other concurrency test
-    held time constant so the whole class of ordering races was invisible)
-
-  Scenario: key must be a non-empty string  [REVISION 4]
-    When calling allow() with None, an int, bytes, or ""
-    Then TypeError (wrong type) or ValueError (empty) is raised
-    (CONTRACT HARDENING, not a reproduced fail-open: None as a key made every
-    unidentified caller share one bucket, which limits too strictly or lets
-    callers exhaust each other's quota — it never let anyone past the limit.
-    Approved as a deliberate tightening for an HTTP-facing API, and recorded
-    separately from the defects that were demonstrated.)
-
-  Scenario: idle keys are forgotten — the key map is bounded  [REVISION 4]
-    Given a limiter with limit 1 per 60 seconds
-    And 1000 distinct keys that each made one request at t=0 and never return
-    When any request arrives after a full window has elapsed
-    Then the limiter retains only keys with a hit inside the current window
-
-  Scenario: the key map is bounded by two windows, not one  [REVISION 4e]
-    Given a limiter with limit 5 per 60 seconds
-    And "armer" at t=0 and "idle" at t=1, then a request at t=60.9
-    When a request arrives at t=100 — "idle" has been idle for 99s
-    Then "idle" is still retained; only at t=121 is it forgotten
-    (the sweep is throttled to once per window, so worst-case retention is
-    just under 2W. The old idle-keys test probed at exactly 2W and so passed
-    under either reading, pinning neither.)
-
-  Scenario: nothing is reclaimed while traffic is silent  [REVISION 4e]
-    Given 50 one-shot keys at t=0
-    When the clock advances by ~166,000 windows and no request is made
-    Then all 50 are still resident; the map shrinks only on the next request
-    (sweeping happens inside allow(), so the bound is "keys seen in the two
-    windows preceding the most recent request", not two windows of wall time)
-
-  Scenario: the sweep is throttled to at most once per window  [REVISION 4e]
-    Given a limiter with limit 5 per 60 seconds and a request at t=0
-    When further requests arrive at t=30 and at t=60 (delta exactly one window)
-    Then no further sweep has run; the sweep at t=61 does run
-    (the throttle carries the accepted-residual-risk argument, and its own
-    boundary was the last age comparison in the file with no test behind it)
-
-  Scenario: the first call always sweeps  [REVISION 4e]
-    Given a fresh limiter with a 60-second window
-    When the very first request arrives at t=30
-    Then a sweep has run
-    (the -inf sentinel exists for exactly this; every other clock in the suite
-    starts at 0.0 or beyond a window, so a 0.0 sentinel was indistinguishable)
-
-  Scenario: a backward clock jump does not suspend reclamation  [REVISION 4e]
-    Given a limiter armed at t=1,000,000
-    When the clock jumps back to 0 and 200 one-shot keys arrive over 400s
-    Then the sweep still runs and the map does not grow without bound
-    (a one-sided throttle left `now` permanently below the last sweep time —
-    measured 20,001 keys retained across seven windows of monotone time)
-
-  Scenario: concurrent callers never exceed the limit  [REVISION 4]
+  Scenario: concurrent callers never exceed the limit
     Given a limiter with limit 1 per 60 seconds
     When many threads call allow() for the same key simultaneously
     Then exactly 1 call returns True
-    (read-prune-check-append was not atomic; measured 2x over-allow)
+
+  Scenario: concurrent commits never invert against the clock read
+    Given two callers whose clock reads return different values
+    When the caller that read the earlier value commits second
+    Then the recorded hits are still in ascending order
+    (both pruning and sweeping assume that order)
+
+  Scenario: idle keys are forgotten — the key map is bounded
+    Given 1000 distinct keys that each made one request at t=0 and never return
+    When any request arrives after a full window has elapsed
+    Then the limiter retains only keys with a hit inside the current window
+
+  Scenario: a key is dropped by the first sweep after one idle window
+    Given "armer" and "idle" both at t=0
+    When a request arrives at t=61, firing the sweep
+    Then "idle" is gone  # the idle threshold is one window, not more
+
+  Scenario: the sweep keeps a key whose newest hit is exactly one window old
+    Given "other" at t=0 arming the sweep, and "k" at t=1
+    When a request arrives at t=61, firing the sweep
+    Then "k" is still limited — its hit is exactly 60s old, not older
+
+  Scenario: the key map is bounded by two windows, not one
+    Given "armer" at t=0 and "idle" at t=1, then a request at t=60.9
+    When a request arrives at t=100 — "idle" has been idle for 99s
+    Then "idle" is still retained; only at t=121 is it forgotten
+    (the sweep is throttled, so residency reaches 2W before the dropping sweep)
+
+  Scenario: nothing is reclaimed while traffic is silent
+    Given 50 one-shot keys at t=0
+    When the clock advances by ~166,000 windows and no request is made
+    Then all 50 are still resident; the map shrinks only on the next request
+
+  Scenario: the sweep is throttled to at most once per window
+    Given a limiter with a 60-second window and a request at t=0
+    When further requests arrive at t=30 and at t=60
+    Then no further sweep has run; the sweep at t=61 does run
+
+  Scenario: the first call always sweeps
+    Given a fresh limiter with a 60-second window
+    When the very first request arrives at t=30
+    Then a sweep has run
+
+  Scenario: a backward clock jump does not suspend reclamation
+    Given a limiter armed at t=1,000,000
+    When the clock jumps back to 0 and 200 one-shot keys arrive over 400s
+    Then the sweep still runs and the map does not grow without bound
 ```
 
 ## Invariants (property-based)
 
-- P1: for any request sequence on one key, allowed count within any window of
-  `window_seconds` (by the times the limiter saw) never exceeds `limit`.
-- P2: interleaving traffic from other keys never changes one key's outcomes.
+- **P1**: for any request sequence on one key, the allowed count within any
+  window of `window_seconds` never exceeds `limit`.
+- **P2**: interleaving traffic from other keys never changes one key's outcomes.
 
 ## Must NOT do
 
-- The limiter under test is never driven by a real clock, and no test makes
-  time pass by sleeping. [REVISION 4, amended: the gate matched only `time.`
-  and missed `from time import sleep`. The wording here previously claimed to
-  cover "every spelling", which a regex cannot do — dynamic imports, renamed
-  helpers, and a caller's own `sleep()` all escape it. The gate blocks known
-  direct wall-clock imports and calls; that is its actual scope.]
-  **Declared exception** [corrected in 4d]: the concurrency tests use
-  `Event.wait(timeout=)` and `Thread.join(timeout=)`. Most are deadlock guards,
-  but TWO are genuine wall-clock dependences and they fail in OPPOSITE
-  directions, which the 4b wording got wrong by naming only the first:
+- **No real clock in tests.** The limiter under test is never driven by a real
+  clock, and no test makes time pass by sleeping. The gate that enforces this
+  is a regex over `tests/`; its scope is known direct wall-clock imports and
+  calls. Dynamic imports, renamed helpers and a caller's own `sleep()` escape
+  it, and the gate does not claim otherwise.
+
+  *Declared exception.* Two assertions in the concurrency tests do depend on
+  real elapsed time, and they fail in opposite directions:
   (1) the atomicity test asserts a blocked thread is still alive after 0.2s —
-  spurious failure only, if a thread is starved that long;
-  (2) `second_done.wait(timeout=0.3)` in the clock-ordering test is not a
-  guard at all: on healthy code it ALWAYS times out (a fixed 0.3s per suite
-  run), and on the mutant that moves the clock read outside the lock the kill
-  depends on the second caller finishing inside that budget. Its spurious
-  direction is therefore a false PASS — a surviving fail-open mutant, the
-  worse direction. Measured margin is ~470x (0.06-0.63ms of 300ms), so it is
-  accepted, not ignored. No limiter in any test reads a real clock.
-- No unbounded memory growth. [REVISION 4: this clause used to read "from
-  denied requests (denials store nothing)". Denials were never the leak;
-  *allowed* requests from keys that never return were. Growth is bounded by
-  the distinct keys seen in the TWO windows preceding the most recent
-  request — see the idle-keys scenario. Precisely [REVISION 4f]: a key is
-  resident at an age of at most exactly 2W when any request is observed, and
-  the sweep that drops it runs strictly LATER than 2W after its last hit.
-  Earlier wording said "just under 2W", which is false in both readings —
-  2W is attained (armer t=0, idle t=40, probes at t=100 and t=160 leave idle
-  resident at age exactly 120.0). The qualifier below is load-bearing
-  [REVISION 4e]: sweeping happens only inside `allow()`, so while traffic is
-  silent nothing is reclaimed at all. Measured with 1000 one-shot keys, clock
-  advanced by ~166,000 windows with no requests, still 1000 keys resident
-  (the scenario and its test use 50, which is the same behaviour at a size
-  that keeps the suite fast);
-  the map drops to 1 only when the next request arrives. Peak resident set is
+  spurious failure only; (2) the clock-ordering test waits up to 0.3s for a
+  racing caller — on healthy code that wait always times out, and its spurious
+  direction is a false PASS, i.e. a surviving fail-open mutant. Measured margin
+  ~470×. Accepted deliberately: the alternative is a test that can hang.
+
+- **No unbounded memory growth.** Growth is bounded by the distinct keys seen
+  in the **two** windows preceding the most recent request. Precisely: a key is
+  resident at an age of at most exactly 2W whenever a request is observed, and
+  the sweep that drops it runs strictly later than 2W after its last hit. The
+  qualifier is load-bearing — sweeping happens only inside `allow()`, so while
+  traffic is silent nothing is reclaimed at all and the peak resident set is
   not released until traffic resumes.
-  REVISION 4d: this clause and the class docstring both said "one window" and
-  were literally false. Because the sweep is throttled to once per window, a
-  key can sit idle for just under 2W before the sweep that drops it runs. Only
-  the residual-risk section had it right; the idle-keys test probed at 2W, so
-  it passed under either reading and pinned neither.]
 
-## Clock contract [REVISION 4]
+## Clock contract
 
-`clock` MUST be monotonic (`time.monotonic`, as `examples/demo.py` uses). A
-forward jump — NTP step, resumed VM — expires every hit at once and resets
-every caller's quota simultaneously. That is inherent to a sliding window over
-a supplied clock and is not defended against in code; it is a caller
-obligation, stated here because the failure model previously implied the
-non-monotonic scenario covered skew in both directions. It covers backward
-skew only.
+`clock` is a caller obligation on three axes. None is checked in code, because
+each check would put a branch on the hot path for a fault the recommended
+clock cannot produce.
 
-`clock` MUST also return a finite number. [REVISION 4b, corrected in 4c] A NaN
-reading is recorded as a hit that can never expire: `now - nan > window` is
-always false, in `_prune` **and in `_sweep`**. Revision 4b claimed the sweep
-would eventually reclaim such a key; it cannot — the sweep uses the same
-comparison. Measured: once a key's newest hit is NaN, the key is retained
-through t=1e18 and that caller is denied forever. **This falsifies the
-temporal memory bound for NaN-poisoned keys**, which is stated here rather
-than left to be inferred. The third NaN injection point is the clock itself,
-and it stays a caller obligation rather than a check because validating every
-reading puts a branch on the hot path for a fault `time.monotonic` cannot
-produce. [4d, corrected in 4e] A NaN reading also disturbs the sweep
-throttle, but NOT permanently: `_last_sweep` becomes NaN and every comparison
-against it is false, so the very next request sweeps — and that sweep
-unconditionally re-anchors `_last_sweep` to a finite value, after which the
-throttle behaves normally. Measured: nan, then 100.0 at t=100, still 100.0 at
-t=101/102/110. The total cost of one NaN reading is **one extra sweep**. The
-4d text claimed an unbounded per-request scan "for the life of the process";
-that was false, and it was written by the revision that fixed the previous
-inaccuracy in this same paragraph. (A clock stuck at NaN forever is a
-different matter and is not what that sentence described.)
+- **Monotonic** (`time.monotonic`, as `examples/demo.py` uses). A forward jump
+  — NTP step, resumed VM — expires every hit at once and resets every caller's
+  quota simultaneously. That is inherent to a sliding window over a supplied
+  clock. Backward skew *is* handled: it fails closed for quota, and the sweep
+  re-arms rather than suspending.
+- **Finite.** A NaN reading is recorded as a hit that can never expire, in
+  pruning or in sweeping, so that key is retained forever and its caller is
+  denied forever — which suspends the memory bound for that key. A NaN also
+  costs one extra unthrottled sweep; the throttle re-anchors on the next
+  finite reading.
+- **Non-reentrant.** The clock is read inside the critical section, so a clock
+  that calls back into the same limiter deadlocks.
 
-`clock` is the only constructor parameter with no validation. That is
-deliberate — a non-callable clock raises TypeError at the first `allow()`,
-which is loud and fail-closed, not the silent acceptance the hostile-config
-row is about. [4d]
+`clock` is also the one constructor parameter with no validation: a
+non-callable clock raises TypeError at the first `allow()`, which is loud and
+fail-closed rather than silently accepted.
 
-`clock` MUST NOT call back into the same limiter. [REVISION 4c] The clock is
-read inside the critical section, so a reentrant clock deadlocks on a
-non-reentrant lock. This is the price of the fix for the ordering race and is
-recorded as an obligation rather than hidden.
+## Accepted residual risk
 
-## Accepted residual risk [REVISION 4b]
-
-The memory bound is **temporal, not cardinal**: keys idle for a window are
-forgotten, but nothing caps how many distinct keys appear *within* one window.
-An attacker who controls the key — which, per the stated deployment, is an IP
-or a request header — can still drive the map arbitrarily large inside a
-single window, and because the sweep is throttled to once per window the
-worst-case retention is closer to two windows than one. This is accepted, not
-overlooked: a cardinality cap needs an eviction policy (which caller gets
-forgotten?), and evicting a live key silently resets its quota — a fail-open
-worse than the memory it saves. Recorded here so the residual reads as
-accepted rather than absent, in the same register as the clock contract.
+The memory bound is **temporal, not cardinal**. Keys idle for a window are
+forgotten, but nothing caps how many distinct keys appear *within* one window,
+so an attacker controlling the key can still drive the map arbitrarily large
+inside a single window. Accepted, not overlooked: a cardinality cap needs an
+eviction policy, and evicting a live key silently resets its quota — a
+fail-open worse than the memory it saves.
 
 ## Failure model (Tier 3)
 
-[REVISION 3, 2026-07-27: retrofitted — the skill now requires an explicit
-failure model before layer selection; these modes were previously implicit
-in the scenarios, Must NOTs, and adversarial pass.]
-
-[REVISION 4, 2026-08-09, amended 4b: independent fresh-context verification
-found rows below claiming coverage they did not have. The standard is now:
-every covered mode must name and demonstrate an **appropriate falsification
-procedure** — a test, a mutant, fault injection, a benchmark, a rollback
-rehearsal, whatever actually fits the risk. Not "a test AND a mutant", which
-just breeds mutants written to fill a table. A row whose catcher cannot be
-shown to fail is a defect, not a mapping.]
+Every covered mode names a **falsification procedure that has been
+demonstrated to fail** — a test, a mutant, fault injection, whatever fits the
+risk. Not "a test AND a mutant", which only breeds mutants written to fill a
+table. A row whose catcher cannot be shown to fail is a defect, not a mapping.
 
 | How this can hurt | Falsification procedure, demonstrated |
 |---|---|
-| over-allowing in a burst (limit not enforced) | scenario tests + P1; mutants M1/M5 killed |
-| under-allowing / fail-closed drift (quota lost) | boundary scenario, demonstrated by killing M2. [4b: this row previously cited M6/M8 — M6 in fact **over**-allows, and M8 is killed by the memory row's tests. Verification also proposed a `while`→`if` mutant here; it proved EQUIVALENT, see mutants.py] |
-| hostile or invalid config silently accepted | validation scenarios for limit, window_seconds AND key + adversarial pass; mutants M4/M7/M9/M15 killed |
-| backward clock skew opening the gate | non-monotonic clock scenario, jump exceeding the window; mutant M10 killed |
-| forward clock skew resetting all quota | **not covered — caller obligation**; see Clock contract |
-| a non-finite clock reading freezing a hit in the window | **not covered — caller obligation**; see Clock contract [4b] |
-| caller identity silently merged (key normalisation) | exact-strings scenario, covering case AND padding; mutants M14/M17 killed. [4c: the row previously cited case-folding only, and `key.strip()` survived it — the P2 pool held `"c "` but not `"c"`, so no two members could merge] |
-| a caller's quota reset by the sweep at the exact boundary | sweep-boundary scenario; mutant M18 killed [4c] |
-| concurrent commits inverted against the clock read | clock-ordering scenario (gated clock forces two callers to read different values); mutant M16 killed. [4c: the lock covered check-and-append but not the clock read. Both earlier concurrency tests held time constant, so no test could tell the two placements apart] |
-| unbounded memory growth (any path) | idle-keys scenario + denials test; mutants M8/M12 killed |
-| concurrent callers racing on shared state | **fault injection**: the atomicity test constructs the interleaving and kills M13 deterministically. The threaded stress test corroborates statistically (per-round detection measured against the real source mutant at 3.7% on this machine — an earlier 5.9% came from a Python replica, not the mutant; 400 rounds puts the miss probability near 3e-7, and the rate is machine-dependent) but cannot be the sole catcher — at 60 rounds the lock-removal mutant was observed surviving 1 run in 50 |
-| the mutation layer reporting kills it never ran | **negative control**: a killer and a strictly-equivalent mutant of identical size under one pinned mtime. Non-vacuity measured three ways [4e]: removing the rmtree alone leaves it green, removing PYTHONDONTWRITEBYTECODE alone trips a RuntimeError tripwire, and removing both plus the tripwire produces the advertised misreport. The 4b wording credited the rmtree; DONTWRITEBYTECODE is what closes the leak |
-| the sweep degrading to an O(distinct keys) scan per request (availability) | throttle scenario + first-call scenario; mutants M19/M21/M22 killed [4e] |
-| backward skew suspending memory reclamation | backward-jump scenario; mutant M20 killed. [4e: the skew row above covers the quota side only — "fails closed" was true of quota and false of memory] |
-| untested code reaching production | coverage layer, now a gate (`--cov-fail-under=100`) — it previously printed a number and could not fail |
-| silent failure in production | n-a: library returns a bool the caller observes directly |
+| over-allowing in a burst | scenario tests + P1; M1/M5 killed |
+| under-allowing / quota lost | boundary scenario; M2 killed (P1 is one-sided and cannot see this) |
+| hostile or invalid config accepted | validation scenarios for limit, window_seconds and key; M4/M7/M9/M15 killed |
+| backward clock skew opening the gate | non-monotonic scenario, jump exceeding the window; M10 killed |
+| backward skew suspending reclamation | backward-jump scenario; M20 killed |
+| forward skew resetting all quota | **not covered — caller obligation** |
+| a non-finite clock reading freezing a hit | **not covered — caller obligation** |
+| caller identity merged by normalisation | exact-strings scenario, case and padding; M14/M17 killed |
+| quota reset by the sweep at the boundary | sweep-boundary scenario; M18 killed |
+| the retention bound silently inflating | first-sweep scenario; M23 killed (the boundary was pinned long before the magnitude was) |
+| unbounded memory growth (any path) | idle-keys + silent-traffic scenarios; M8/M12 killed |
+| the sweep degrading to an O(keys) scan | throttle + first-call scenarios; M19/M21/M22 killed |
+| concurrent callers racing on shared state | **fault injection**: the atomicity test constructs the interleaving and kills M13 deterministically. The threaded stress test only corroborates — it is statistical (see evidence.md) |
+| commits inverted against the clock read | clock-ordering scenario with a gated clock; M16 killed |
+| the mutation layer reporting kills it never ran | **negative control**: a killer and a strictly-equivalent mutant of identical size under one pinned mtime, proven non-vacuous by removing the defence |
+| untested code reaching production | coverage layer, a gate at `--cov-fail-under=100` |
+| silent failure in production | n-a: the library returns a bool the caller observes directly |
 
 ## Setup plan
 
-[REVISION 3, 2026-07-27: retrofitted — the skill now requires dependencies
-to be justified in the spec. Original setup was authorized conversationally.]
-
-- Runtime dependencies: **none** — stdlib (`collections.deque`, `math`) suffices.
-- Dev toolchain (pinned in `requirements-dev.txt`, never shipped):
-  - pytest + pytest-cov + coverage — test runner and changed-line coverage
-  - mypy — strict type checking
-  - ruff — lint, format, and complexity budget (mccabe ≤ 8)
-  - hypothesis — property-based invariants P1/P2
-  - pip-audit — vulnerability audit of the pinned toolchain
-  - pytest-randomly — randomized test order (suite-health layer)
-- Git: repo-level; commits at each milestone; evidence binds to commit SHA.
+- Runtime dependencies: **none** — `collections.deque`, `math` and
+  `threading.Lock` are stdlib.
+- Dev toolchain (pinned in `requirements-dev.txt`, never shipped): pytest +
+  pytest-cov + coverage (tests and changed-line coverage), mypy (strict types),
+  ruff (lint, format, mccabe ≤ 8), hypothesis (P1/P2), pip-audit (toolchain
+  vulnerabilities), pytest-randomly (suite health).
+- Git: repo-level; commits at each milestone; evidence binds to a commit SHA.
 - Files the gauntlet adds: `tools/gauntlet.sh` (entry point), `tools/mutants.py`
-  (scripted manual mutation), `.github/workflows/gauntlet.yml` (CI),
-  `tools/must_not_match.sh` + `tools/test_gauntlet_checks.sh` (fail-closed
-  scan helper and its self-test).
-- [REVISION 4] Runtime dependencies remain **none**: `threading.Lock` is
-  stdlib. The coverage layer gains `--cov-fail-under=100`, making it a gate
-  rather than a report.
+  (scripted mutation + its negative control), `tools/must_not_match.sh` and
+  `tools/test_gauntlet_checks.sh` (fail-closed scan helper and its self-test),
+  `tools/source_state.sh`, `.github/workflows/gauntlet.yml` (CI).
 
-## Explicitly out of scope [REVISION 4]
+## Explicitly out of scope
 
 - **Retry-After / remaining-quota accessor.** `allow(key) -> bool` gives an
   HTTP frontend no way to populate `Retry-After` or `X-RateLimit-Remaining`,
-  which RFC 9110 expects alongside a 429. Raised by both verification passes.
-  Declined here because it changes the public API shape and the contract asks
-  only to bound request frequency — recorded so the gap is visible rather than
-  absent.
+  which RFC 9110 expects alongside a 429. Declined: it changes the public API
+  shape, and the contract asks only to bound request frequency. Recorded so
+  the gap is visible rather than absent.
 - **Distributed / multi-process limiting.** In-process state only.
+
+## Revision history
+
+Revisions 1–3 (2026-07-25 → 07-27) were made autonomously during the original
+build and were never human-approved; the failure model in revision 3 was
+retrofitted after implementation. Revision 4 and its amendments (2026-08-09 →
+08-10) were approved item by item before implementation, and each amendment
+answers a specific finding from an independent verification round. The
+per-revision forensics live in `evidence.md` and in git.

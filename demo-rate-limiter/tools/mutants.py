@@ -17,20 +17,13 @@ PYCACHE = TARGET.parent / "__pycache__"
 PYTEST = ROOT / ".venv/bin/pytest"
 
 # CPython validates a cached .pyc against (source mtime in whole seconds,
-# source size). Two mutants of identical size written inside the same second
-# are indistinguishable to that check, so the second one silently runs the
-# first one's bytecode. M4 and M5 are both exactly one byte shorter than the
-# original and adjacent in the list, so M5 -- the fail-open mutant -- was
-# reported KILLED on the strength of M4's code. The bias is toward inflating
-# the kill count, which can never surface as a red gauntlet. Both defences are
-# needed only as a belt-and-braces pair, and an earlier version of this
-# comment had the roles backwards. Measured three ways: removing the rmtree
-# alone leaves the control green; removing DONTWRITEBYTECODE alone trips the
-# tripwire below with a RuntimeError; only removing both AND the tripwire
-# reproduces the misreport. DONTWRITEBYTECODE is what actually closes the
-# leak — with no .pyc written during a run there is nothing to inherit — and
-# gauntlet.sh clears __pycache__ before the layer starts anyway. The rmtree
-# covers the case of running this script directly on a dirty tree.
+# source size), so two mutants of identical size written inside the same
+# second are indistinguishable to it and the second silently runs the first
+# one's bytecode. M4 and M5 are such a pair. The bias is always toward
+# inflating the kill count, which can never surface as a red gauntlet.
+# DONTWRITEBYTECODE is what closes the leak: with no .pyc written during a run
+# there is nothing to inherit. The rmtree covers running this script directly
+# on a dirty tree; the tripwire below catches the env var being lost.
 MUTANT_ENV = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
 
 MUTANTS = [
@@ -179,23 +172,18 @@ MUTANTS = [
 ]
 
 
-# Negative control for the harness itself: two mutants of IDENTICAL size, a
-# killer followed by a proven-equivalent one. (Both are length-PRESERVING, so
-# all three files are the same size; an earlier version of this comment also
-# said "each one byte shorter than the original", which describes M4/M5, not
-# these. Only C1 == C2 matters for the collision.)
-# If bytecode caching ever leaks between runs again, the equivalent mutant
-# inherits the killer's result and is misreported as KILLED. Run with
-# --negative-control; run as a gate by tools/gauntlet.sh before the real
-# mutation pass. (It is NOT part of test_gauntlet_checks.sh, which covers
-# must_not_match only — an earlier comment here claimed otherwise.)
-# Both mutations are length-preserving, so the two mutated files are the same
-# size; with a pinned mtime the (mtime, size) collision is constructed, not
-# waited for. C2 must be STRICTLY equivalent: `or` over two side-effect-free
-# isinstance checks is commutative. An earlier attempt used the sweep throttle
-# (`<=` -> `<`), which differs at now - last_sweep == window and so can change
-# the key map — not equivalent once the memory bound is part of the contract,
-# and it would have turned red the day a test pinned that boundary.
+# Negative control for the harness itself: a killer and a strictly-equivalent
+# mutant. Both mutations are length-preserving, so the two mutated files are
+# the same size, and with a pinned mtime the (mtime, size) collision is
+# constructed rather than waited for. If bytecode ever leaks between runs
+# again, C2 inherits C1's verdict and is misreported as KILLED.
+#
+# C2 must be STRICTLY equivalent: `or` over two side-effect-free isinstance
+# checks is commutative. Anything merely "equivalent under today's tests"
+# turns red the day a test pins it.
+#
+# Run as a gate by tools/gauntlet.sh before the real mutation pass; it is not
+# part of test_gauntlet_checks.sh, which covers must_not_match only.
 CONTROL = [
     ("C1 killer (control)", "if limit <= 0:", "if limit >= 0:"),
     (
