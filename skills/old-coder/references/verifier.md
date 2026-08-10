@@ -4,10 +4,12 @@ The protocol for the "Independent verification" section of SKILL.md. Read it
 in full before claiming verification was performed; the summary in SKILL.md is
 not the protocol.
 
-This is not a gauntlet layer and should not be run like one. Every layer is a
-command returning an exit code; this is an agent returning prose that a human
-has to grade. It exists because the gauntlet can only check what the spec
-says — the gauntlet is not what is in question.
+This is not a gauntlet layer and should not be run like one. A layer is an
+executable check with a machine-evaluable result; this is an agent returning
+prose a human has to grade. It exists because the gauntlet is necessary but
+not self-authenticating: the spec may be incomplete, a checker may be unsound,
+a mapping may overclaim, and EVIDENCE may not describe the state that shipped.
+The attack order below goes after all four.
 
 ## Blind-phase inputs — exactly four
 
@@ -24,8 +26,13 @@ Give the verifier, before it sees anything else:
    when git is absent).
 4. **The gauntlet entry point.**
 
-Withhold the builder's conversation and the draft EVIDENCE. If a claim needs
-the builder's justification to stand, it is not proven.
+This protocol is instruction, not task evidence; the four-item limit applies
+to task-specific inputs. The verifier is expected to know how to attack — it
+is not expected to know anything about this task that the four items do not
+carry.
+
+Withhold the builder's conversation, the draft EVIDENCE, and the case study.
+If a claim needs the builder's justification to stand, it is not proven.
 
 The verifier reads the implementation freely — it is an attacker, not the
 human whose review you are trying to make optional.

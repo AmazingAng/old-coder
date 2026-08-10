@@ -232,14 +232,15 @@ Scale effort to blast radius, and say which tier you chose:
 
 The gauntlet is evidence, not self-authentication: its checkers can be
 unsound, its mappings can overclaim, and the spec can be incomplete. Human
-spec approval covers only the last, and only before any code exists.
+spec approval mitigates only the last, by breaking author correlation, and
+only before code exists — it does not make a spec complete.
 
 Independent verification answers the rest where the stakes justify it: a
 fresh-context agent that attacks the finished work before EVIDENCE is signed.
 It reduces **task-context** correlation, not model correlation. **It is not a
-gauntlet layer** — a layer is a command returning an exit code in seconds;
-this is an agent returning prose a human must judge, spending the one resource
-this skill otherwise guards. Experimental: the evidence is one case study
+gauntlet layer** — a layer is an executable check with a machine-evaluable
+result; this is an agent returning prose a human must judge, spending the one
+resource this skill otherwise guards. Experimental: the evidence is one case study
 (`references/verifier-case-study.md` — for deciding whether to run this, not
 for the verifier to read), not a benchmark.
 
