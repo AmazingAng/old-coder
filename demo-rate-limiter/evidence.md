@@ -10,7 +10,9 @@
 - Source state: git commit `8b88bda`; sha256 tree hash `c80e8cccf0a1ed3a` —
   reproduce both with `./tools/source_state.sh` (works from any directory;
   now includes `.github/workflows`, which decides whether the gauntlet runs
-  in CI at all).
+  in CI at all). Commits after `8b88bda` on this branch touch only
+  `skills/`, which is outside the hashed tree — hence the same hash at a
+  later HEAD, not a stale binding.
 - Toolchain: pinned in `requirements-dev.txt` (local run: Python 3.14.3;
   CI runs the same gauntlet on 3.12 via `.github/workflows/gauntlet.yml`).
 - Entry point: `./tools/gauntlet.sh` reruns every layer below.
@@ -129,7 +131,10 @@ round 6 and are therefore **not independently verified**:
 
 - the sweep threshold magnitude test and mutant M23;
 - the vacuous-pass assertion added to the clock-ordering test;
-- the six prose corrections listed in commit `66df5cd`.
+- the six prose corrections listed in commit `66df5cd`;
+- the prune of `spec.md` from 339 to 255 lines in commit `8b88bda`. No clause
+  was changed, but it is a large edit to the document a verifier attacks
+  hardest, and it was made after the last verified state.
 
 ## Honest notes
 
