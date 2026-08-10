@@ -12,9 +12,11 @@ Your job is to make those two artifacts trustworthy enough that line-by-line
 review becomes optional within the spec's boundaries.
 
 This inverts the normal review model: **trust moves from inspection to
-constraints.** Be honest about what that buys: the gauntlet proves the code
-satisfies every constraint the spec expresses — it cannot prove the spec
-expresses everything that matters. That is exactly why the human approves the
+constraints.** Be honest about what that buys: the gauntlet turns the
+constraints the spec expresses into executable evidence — it cannot show the
+spec expresses everything that matters, and it is not self-authenticating,
+because a checker can be unsound and a mapping can claim more than it
+demonstrates. That is exactly why the human approves the
 SPEC (the one artifact that breaks the everything-authored-by-the-same-agent
 correlation), and why EVIDENCE reports layered, auditable confidence, never
 absolute proof. Every shortcut you take against the gauntlet destroys the only
@@ -228,59 +230,43 @@ Scale effort to blast radius, and say which tier you chose:
 
 ## Independent verification (Tier 3 option, experimental)
 
-The gauntlet is not what is in question here. It proves the code satisfies
-every constraint the spec expresses, and it does that well. What no layer can
-check is whether the **spec expresses the right constraints**, or whether
-EVIDENCE honestly describes the code that shipped. Human spec approval is this
-skill's answer to the first — but it happens before any code exists, so it
-cannot catch anything you did afterwards.
+The gauntlet is evidence, not self-authentication: its checkers can be
+unsound, its mappings can overclaim, and the spec can be incomplete. Human
+spec approval mitigates only the last, by breaking author correlation, and
+only before code exists — it does not make a spec complete.
 
-Independent verification is a second answer for stakes that justify one: a
+Independent verification answers the rest where the stakes justify it: a
 fresh-context agent that attacks the finished work before EVIDENCE is signed.
-It reduces **task-context** correlation — your framing, your justifications,
-the assumption you carried since turn 3. On the same model or model family,
-model-level blind spots remain. Neither is independence in a strong sense, and
-EVIDENCE says so.
+It reduces **task-context** correlation, not model correlation. **It is not a
+gauntlet layer** — a layer is an executable check with a machine-evaluable
+result; this is an agent returning prose a human must judge, spending the one
+resource this skill otherwise guards. Experimental: the evidence is one case study
+(`references/verifier-case-study.md` — for deciding whether to run this, not
+for the verifier to read), not a benchmark.
 
-**It is not a gauntlet layer.** Every layer is a command that returns an exit
-code in seconds. This is an agent that takes minutes, costs tokens on the
-order of a small task, and returns **prose someone has to judge** — findings
-to grade, equivalent mutants to rule out, false positives to dismiss. It
-spends the one resource this skill otherwise guards carefully: human
-attention. Reach for it when a spec gap would be expensive and the code is
-already green, not because a task feels important.
+**The protocol is `references/verifier.md`. Verification has not been performed
+until that file has been read in full and executed; missing or unreadable →
+`blocked`, never `passed`.** What cannot be traded away:
 
-Marked experimental: the evidence for it is one case study, written up in
-`references/verifier.md`, not a benchmark.
-
-The non-negotiable rules — **the protocol is `references/verifier.md`, and
-verification has not been performed until that file has been read in full and
-executed. Missing or unreadable → `blocked`, never `passed`.**
-
-- **Fresh context, four inputs only**: the task contract (the request plus
-  every requirement the human has approved since), the approved SPEC, the repo
-  at an exact source state, the gauntlet entry point. Never your conversation.
-- **Blind first, compare second.** The verifier reproduces and attacks alone,
-  records what it found, and only then sees the draft EVIDENCE. That record is
-  append-only afterwards.
-- **It fixes nothing.** A verifier that patches code becomes an author. A SPEC
-  gap goes back to the **human**, never to the builder to self-amend.
-- **Grade the findings, or this never terminates.** A **behavioural** finding
-  (the code does the wrong thing; a gate cannot fail) is fixed and re-verified
-  in a *new* verifier context. A **description or mapping** finding (the spec,
-  a comment, or EVIDENCE says something untrue about code that is correct) is
-  fixed and disclosed, and does **not** buy another round. Without this split,
-  "fix every finding" times "re-verify after every change" is a loop that ends
-  only when a round returns the empty set — and prose has no such fixpoint.
-  The trade is real: grading buys termination by giving up completeness, and a
-  behavioural gap can survive inside a round you chose not to run.
-- **Cap the rounds.** Two by default; more needs explicit human approval. The
-  cap does not stop the spending, it makes the spending someone's decision.
-- **Four states in EVIDENCE**: `passed` finalizes; `failed` and `blocked`
-  (verification could not be completed) do not; `not performed` finalizes only
-  as a declared downgrade, following the same rule as an unapproved spec. On
-  Tier 3, `not performed` is the default and needs no apology — say so and
-  claim correspondingly less.
+- **Fresh context, blind first**, four inputs only — the task contract, the
+  approved SPEC, an exact source state, the entry point. Never your
+  conversation. The draft EVIDENCE comes after its own results, not before.
+- **It fixes nothing.** A SPEC gap goes to the human, never to the builder to
+  self-amend.
+- **The human grades the findings.** Behavioural findings are fixed and
+  re-verified in a new context; description and mapping findings are fixed and
+  disclosed without buying another round. Propose a grade if you like — the
+  human decides any disputed or material one, and approves stopping at the
+  cap. Self-grading is the obvious way to make this rule fail open.
+- **Cap at two rounds**, more only by explicit approval. The cap does not limit
+  the spending; it makes the spending someone's decision.
+- **Verification is source-state-specific.** A state no verifier saw is
+  `not performed`, whatever earlier rounds concluded. Fixing a behavioural
+  finding after the final permitted round therefore ships an unverified state:
+  record that as a declared downgrade and keep the earlier rounds as history.
+- **Four states**: `passed` finalizes; `failed` and `blocked` do not;
+  `not performed` finalizes only as a declared downgrade, like an unapproved
+  spec. On Tier 3 it needs no apology — say so and claim less.
 
 ## Setup
 

@@ -4,14 +4,16 @@ The protocol for the "Independent verification" section of SKILL.md. Read it
 in full before claiming verification was performed; the summary in SKILL.md is
 not the protocol.
 
-This is not a gauntlet layer and should not be run like one. Every layer is a
-command returning an exit code; this is an agent returning prose that a human
-has to grade. It exists because the gauntlet can only check what the spec
-says — the gauntlet is not what is in question.
+This is not a gauntlet layer and should not be run like one. A layer is an
+executable check with a machine-evaluable result; this is an agent returning
+prose a human has to grade. It exists because the gauntlet is necessary but
+not self-authenticating: the spec may be incomplete, a checker may be unsound,
+a mapping may overclaim, and EVIDENCE may not describe the state that shipped.
+The attack order below goes after all four.
 
-## Inputs — exactly four
+## Blind-phase inputs — exactly four
 
-Give the verifier:
+Give the verifier, before it sees anything else:
 
 1. **The task contract.** The user's original request *plus every requirement,
    scope change and spec revision a human has explicitly approved since*. Not
@@ -24,8 +26,13 @@ Give the verifier:
    when git is absent).
 4. **The gauntlet entry point.**
 
-Withhold the builder's conversation and the draft EVIDENCE. If a claim needs
-the builder's justification to stand, it is not proven.
+This protocol is instruction, not task evidence; the four-item limit applies
+to task-specific inputs. The verifier is expected to know how to attack — it
+is not expected to know anything about this task that the four items do not
+carry.
+
+Withhold the builder's conversation, the draft EVIDENCE, and the case study.
+If a claim needs the builder's justification to stand, it is not proven.
 
 The verifier reads the implementation freely — it is an attacker, not the
 human whose review you are trying to make optional.
@@ -44,8 +51,10 @@ builder's framing and its fresh context is wasted.
 Record what was tried at each surface, including the attacks that found
 nothing. The attack list is the deliverable; findings are a bonus.
 
-1. **The run.** Execute the entry point from the stated source state. Numbers
-   that disagree with the draft EVIDENCE mean the draft is wrong, not the run.
+1. **The run.** Execute the entry point from the stated source state and
+   record the result blind. Once the draft EVIDENCE is revealed, any mismatch
+   suspends its claim until source state, environment, freshness and
+   determinism have been reconciled — do not silently prefer either number.
    First confirm the environment actually tests the tree it claims to —
    a copied virtualenv, a stale install, or a cached artifact can silently
    exercise the original sources and make every later result meaningless.
@@ -95,20 +104,48 @@ builder to write a test that asserts non-behavior.
 | **Behavioural**: the code does the wrong thing, or a gate cannot fail | fix, then re-verify in a **new** verifier context |
 | **Description / mapping**: the spec, a comment or EVIDENCE says something untrue about code that is correct | fix and disclose; **no new round** |
 
+**The human grades, not the builder.** The builder may propose a grade; the
+human decides any material or disputed one and approves stopping at the cap.
+Left to self-grading this rule fails open in the obvious way — call a boundary
+defect a documentation defect and the round is avoided. It matters most when
+the finding touches the SPEC, where the question is precisely whether the
+document is wrong about correct code, or whether it has exposed a behavioural
+requirement nobody wrote down. That is the human's call by the same rule that
+sends SPEC gaps to the human in the first place.
+
 Without this split, "fix every finding" times "start a new verifier after any
 change" is a loop that terminates only when a round returns the empty set.
 Prose has no such fixpoint.
 
 **Be clear about the trade.** Grading buys termination by giving up
-completeness. A behavioural gap can live inside a round you chose not to run —
-in the case study below, the round that would have been skipped under this
-rule is the one that found an unpinned threshold magnitude. That is the price,
-and it is worth paying, because the alternative is a process with no stopping
-condition at all. Say in EVIDENCE which rounds were not run.
+completeness. A behavioural gap can live inside a round you chose not to run,
+and that is not hypothetical — it has happened at least once, in the run
+written up in `verifier-case-study.md`. The price is worth paying because the
+alternative is a process with no stopping condition at all. Say in EVIDENCE
+which rounds were not run.
 
 Cap at two rounds by default. More needs explicit human approval, recorded.
 The cap does not stop the spending; it makes the spending someone's decision,
 which is the part that was missing when this protocol was first drafted.
+
+## Verification is source-state-specific
+
+A verdict attaches to the state that was verified, not to the project. A state
+no verifier has seen is `not performed`, however many rounds preceded it and
+whatever they concluded.
+
+This bites at exactly one place: a behavioural finding fixed after the final
+permitted round. The fix is correct and the round cap is correct, and the
+shipped state is still unverified. Do not launder that by inheriting the
+previous verdict, and do not invent a fifth state for it. Record the final
+state as `not performed` — a declared downgrade — and keep the earlier rounds
+as history:
+
+```text
+Independent verification: not performed against final source state <SHA>.
+<n> earlier rounds were performed; the last verified state <SHA> returned
+<verdict>, and the fixes made since are disclosed below as unverified.
+```
 
 ## Four states, recorded in EVIDENCE
 
@@ -139,35 +176,3 @@ last verified state, say which — they are not independently verified.
 - Canary: <planted defect → caught | MISSED, verdict void | not run>
 - Fixed after the last verified state, therefore unverified: <list | none>
 ```
-
-## What one case study showed
-
-Six rounds against a 99-line Python rate limiter that was already passing ten
-gauntlet layers, 100% branch coverage and 8/8 mutation, with a
-multiply-rebound evidence report. Same model as the builder throughout, so
-this measures reproducibility, not model independence. Roughly 550k tokens.
-
-- **Rounds 1–3 found five behavioural defects** nothing in the gauntlet could
-  reach: an unbounded key map usable as a remote memory-exhaustion attack
-  against the component meant to prevent one; `limit=NaN` producing a limiter
-  that always allowed; 2× over-allow under threads; a lock that covered
-  check-and-append but not the clock read; and — the most transferable one —
-  a mutation runner reporting kills for mutants it never executed, because
-  two same-size mutants written in the same second shared a bytecode cache.
-  That last defect could only ever inflate the score, so it could never
-  surface as a red gauntlet.
-- **Rounds 4–6 found one behavioural gap and a stream of prose inaccuracies**,
-  two of which were introduced by the round that fixed the previous one. That
-  is why a single clean round does not mean converged, and why the grading
-  rule above exists. The marginal round was clearly negative by round 5.
-- **An A/B design failed.** Planting a defect in one copy and verifying a
-  clean copy as a false-positive control did not work: the "clean" copy was
-  not clean — it independently invented the planted mutation and correctly
-  reported it. No false-positive rate could be measured. The two false
-  positives that did occur were both caused by feeding the verifier a
-  subdirectory instead of the repository, and a tree polluted by an editable
-  install. **Verifier noise tracked input quality.**
-- **Verification's late-stage output is not bugs.** It is the discovery that
-  SPEC and EVIDENCE are describing code that does something else — which
-  matters precisely because those two documents are the only things the human
-  reads.

@@ -4,9 +4,13 @@
   each contract change item by item before implementation. Earlier revisions
   (2026-07-25, 2026-07-27) were autonomous and are still unapproved; treat
   them as the weaker part of the spec.
-- Independent verification: **six fresh-context rounds**, the last against
-  commit `d0b506c`. See "Independent verification" below — including what the
-  final round found and what was deliberately left unfixed.
+- Independent verification: **not performed against the final source state
+  `8b88bda`.** Six earlier rounds were performed; the last verified state
+  `d0b506c` returned `failed`, and the fixes made since — one of them
+  behavioural — are disclosed below as unverified. This report is finalized as
+  a **declared downgrade**, not on the strength of a passing verdict. A
+  verdict attaches to the state a verifier actually saw, and no verifier has
+  seen this one.
 - Source state: git commit `8b88bda`; sha256 tree hash `c80e8cccf0a1ed3a` —
   reproduce both with `./tools/source_state.sh` (works from any directory;
   now includes `.github/workflows`, which decides whether the gauntlet runs
@@ -126,8 +130,14 @@ converge just because one round comes back clean.
 
 **Verification stopped after round 6, deliberately.** A rule of "fix every
 finding, then start a new verifier" only terminates when a round returns the
-empty set, and prose has no such fixpoint. The findings below were fixed after
-round 6 and are therefore **not independently verified**:
+empty set, and prose has no such fixpoint.
+
+That decision has a price this report states rather than hides: round 6's
+verdict was `failed`, one of its findings was behavioural, and the state that
+ships was never verified. Under the protocol's own four states, that makes the
+final state `not performed` — the earlier rounds are history, not a
+certificate. The following were fixed after round 6 and are **not
+independently verified**:
 
 - the sweep threshold magnitude test and mutant M23;
 - the vacuous-pass assertion added to the clock-ordering test;
