@@ -1,7 +1,13 @@
 # VERIFY: fresh-context adversarial verification
 
-The protocol for SKILL.md §6. Read it in full before claiming VERIFY was
-performed; the summary in SKILL.md is not the protocol.
+The protocol for the "Independent verification" section of SKILL.md. Read it
+in full before claiming verification was performed; the summary in SKILL.md is
+not the protocol.
+
+This is not a gauntlet layer and should not be run like one. Every layer is a
+command returning an exit code; this is an agent returning prose that a human
+has to grade. It exists because the gauntlet can only check what the spec
+says — the gauntlet is not what is in question.
 
 ## Inputs — exactly four
 
@@ -93,7 +99,16 @@ Without this split, "fix every finding" times "start a new verifier after any
 change" is a loop that terminates only when a round returns the empty set.
 Prose has no such fixpoint.
 
+**Be clear about the trade.** Grading buys termination by giving up
+completeness. A behavioural gap can live inside a round you chose not to run —
+in the case study below, the round that would have been skipped under this
+rule is the one that found an unpinned threshold magnitude. That is the price,
+and it is worth paying, because the alternative is a process with no stopping
+condition at all. Say in EVIDENCE which rounds were not run.
+
 Cap at two rounds by default. More needs explicit human approval, recorded.
+The cap does not stop the spending; it makes the spending someone's decision,
+which is the part that was missing when this protocol was first drafted.
 
 ## Four states, recorded in EVIDENCE
 

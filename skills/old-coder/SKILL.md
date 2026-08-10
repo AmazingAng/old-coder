@@ -24,8 +24,8 @@ basis of trust.
 
 ```
 SPEC → (human approves spec, not code) → RED → GREEN → REFACTOR → GAUNTLET → EVIDENCE
-                                          ↑_____________________|          ↘ [VERIFY] ↗
-                                              repeat per behavior         Tier 3, capped
+                                          ↑_____________________|
+                                              repeat per behavior
 ```
 
 ### 1. SPEC — the only thing the human reads before code
@@ -156,46 +156,7 @@ EVIDENCE rather than adding a meaningless test to kill them — that would
 violate anti-gaming rule 4. Hand-written mutants (the manual procedure) get no
 such excuse: you chose them, so choose real bugs.
 
-### 6. VERIFY — fresh-context adversarial pass (Tier 3, experimental)
-
-One agent authored the spec, the tests, the implementation, the checkers, and
-the report that grades them. VERIFY adds a second agent at the end, with a
-fresh context, that attacks the work before EVIDENCE is finalized. It reduces
-**task-context** correlation — your framing, your justifications, the
-assumption you carried since turn 3. If the verifier runs on the same model
-or model family, model-level blind spots remain; a different model narrows
-those too. Neither is independence in a strong sense, and EVIDENCE says so.
-
-Marked experimental: it is expensive, and the evidence for it so far is one
-case study (`references/verifier.md`), not a benchmark.
-
-The non-negotiable rules — **the protocol is `references/verifier.md`, and
-VERIFY has not been performed until that file has been read in full and
-executed. Missing or unreadable → `blocked`, never `passed`.**
-
-- **Tier 3 runs it by default.** Skipping is a declared reduction in EVIDENCE,
-  never a silent one.
-- **Fresh context, four inputs only**: the task contract (the request plus
-  every requirement the human has approved since), the approved SPEC, the repo
-  at an exact source state, the gauntlet entry point. Never your conversation.
-- **Blind first, compare second.** The verifier reproduces and attacks alone,
-  records what it found, and only then sees the draft EVIDENCE. That record is
-  append-only afterwards.
-- **It fixes nothing.** A verifier that patches code becomes an author. A SPEC
-  gap goes back to the **human**, never to the builder to self-amend.
-- **Grade the findings, or this never terminates.** A **behavioural** finding
-  (the code does the wrong thing; a gate cannot fail) is fixed and re-verified
-  in a *new* verifier context. A **description or mapping** finding (the spec,
-  a comment, or EVIDENCE says something untrue about code that is correct) is
-  fixed and disclosed, and does **not** buy another round. Without this split,
-  "fix every finding" times "re-verify after every change" is a loop that ends
-  only when a round returns the empty set — and prose has no such fixpoint.
-- **Cap the rounds.** Two by default; more needs explicit human approval.
-- **Four states in EVIDENCE**: `passed` finalizes; `failed` and `blocked`
-  (verification could not be completed) do not; `not performed` finalizes only
-  as a declared downgrade, following the same rule as an unapproved spec.
-
-### 7. EVIDENCE — the only thing the human reads after code
+### 6. EVIDENCE — the only thing the human reads after code
 
 End with a report the human can trust without opening a single source file
 (template in `references/gauntlet.md`):
@@ -261,8 +222,65 @@ Scale effort to blast radius, and say which tier you chose:
   (tool-based if available) + adversarial pass — one explicit step trying to
   break your own implementation with hostile inputs before declaring done.
   Failure modes deliberately not covered go in EVIDENCE as known limits.
-  Then add VERIFY (§6): the adversarial pass is you attacking your own work
-  and shares your blind spots; a fresh context does not.
+  The adversarial pass is you attacking your own work and shares your blind
+  spots; where a spec gap would be expensive, consider independent
+  verification below — a different kind of assurance, not another layer.
+
+## Independent verification (Tier 3 option, experimental)
+
+The gauntlet is not what is in question here. It proves the code satisfies
+every constraint the spec expresses, and it does that well. What no layer can
+check is whether the **spec expresses the right constraints**, or whether
+EVIDENCE honestly describes the code that shipped. Human spec approval is this
+skill's answer to the first — but it happens before any code exists, so it
+cannot catch anything you did afterwards.
+
+Independent verification is a second answer for stakes that justify one: a
+fresh-context agent that attacks the finished work before EVIDENCE is signed.
+It reduces **task-context** correlation — your framing, your justifications,
+the assumption you carried since turn 3. On the same model or model family,
+model-level blind spots remain. Neither is independence in a strong sense, and
+EVIDENCE says so.
+
+**It is not a gauntlet layer.** Every layer is a command that returns an exit
+code in seconds. This is an agent that takes minutes, costs tokens on the
+order of a small task, and returns **prose someone has to judge** — findings
+to grade, equivalent mutants to rule out, false positives to dismiss. It
+spends the one resource this skill otherwise guards carefully: human
+attention. Reach for it when a spec gap would be expensive and the code is
+already green, not because a task feels important.
+
+Marked experimental: the evidence for it is one case study, written up in
+`references/verifier.md`, not a benchmark.
+
+The non-negotiable rules — **the protocol is `references/verifier.md`, and
+verification has not been performed until that file has been read in full and
+executed. Missing or unreadable → `blocked`, never `passed`.**
+
+- **Fresh context, four inputs only**: the task contract (the request plus
+  every requirement the human has approved since), the approved SPEC, the repo
+  at an exact source state, the gauntlet entry point. Never your conversation.
+- **Blind first, compare second.** The verifier reproduces and attacks alone,
+  records what it found, and only then sees the draft EVIDENCE. That record is
+  append-only afterwards.
+- **It fixes nothing.** A verifier that patches code becomes an author. A SPEC
+  gap goes back to the **human**, never to the builder to self-amend.
+- **Grade the findings, or this never terminates.** A **behavioural** finding
+  (the code does the wrong thing; a gate cannot fail) is fixed and re-verified
+  in a *new* verifier context. A **description or mapping** finding (the spec,
+  a comment, or EVIDENCE says something untrue about code that is correct) is
+  fixed and disclosed, and does **not** buy another round. Without this split,
+  "fix every finding" times "re-verify after every change" is a loop that ends
+  only when a round returns the empty set — and prose has no such fixpoint.
+  The trade is real: grading buys termination by giving up completeness, and a
+  behavioural gap can survive inside a round you chose not to run.
+- **Cap the rounds.** Two by default; more needs explicit human approval. The
+  cap does not stop the spending, it makes the spending someone's decision.
+- **Four states in EVIDENCE**: `passed` finalizes; `failed` and `blocked`
+  (verification could not be completed) do not; `not performed` finalizes only
+  as a declared downgrade, following the same rule as an unapproved spec. On
+  Tier 3, `not performed` is the default and needs no apology — say so and
+  claim correspondingly less.
 
 ## Setup
 
