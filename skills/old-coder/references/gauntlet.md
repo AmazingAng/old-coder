@@ -10,7 +10,7 @@ Makefile / CI config first). These are the defaults when nothing exists.
 | Tests | pytest | `pytest -q` |
 | Types | mypy | `mypy <pkg>` (or pyright) |
 | Lint + format | ruff | `ruff check . && ruff format --check .` |
-| Changed-line coverage | coverage.py | `pytest --cov=<pkg> --cov-branch --cov-report=term-missing` then verify the lines you touched appear covered; `diff-cover coverage.xml` automates changed-line % against git |
+| Changed-line coverage | coverage.py | `pytest --cov=<pkg> --cov-branch --cov-report=term-missing --cov-fail-under=<n>` — without the threshold flag the layer prints a number and exits 0, so it can never fail; `diff-cover coverage.xml --fail-under=100` gates changed lines specifically |
 | Mutation | mutmut (3+) | configure `[tool.mutmut] source_paths = ["src/"]` in pyproject.toml, then `mutmut run` (target one module with `mutmut run "my_module*"`); survivors = weak tests |
 | Property-based | hypothesis | `@given(...)` strategies for invariants |
 
@@ -196,6 +196,8 @@ scenario so the evidence report's spec→test mapping is mechanical.
   in prose is working-directory-sensitive and will fail to reproduce
 - Toolchain: <pinned versions file, e.g. requirements-dev.txt>
 - Entry point: <single command that reruns every layer>
+- Independent verification: <not performed | passed | failed | blocked>
+  (Tier 3; protocol and full template in `verifier.md`)
 
 ### Spec → Test mapping
 Status is one of: **pass / fail / unverified / n-a**. A row mapped to
@@ -218,6 +220,15 @@ Status is one of: **pass / fail / unverified / n-a**. A row mapped to
 | Real execution | <cmd> | <observed output> |
 | Supply chain | <cmd> | 0 known vulns; new deps: none (or list, each ↔ SPEC justification) |
 | Suite health | <cmd> | randomized order (seed <n>), all passed |
+
+### Independent verification (never omit; see verifier.md)
+- Verifier: <host / model family>; fresh context; which inputs it received;
+  what correlation that breaks and what it does not.
+- Rounds: <n> (cap <m>); verdict per round.
+- Attacked: <what was tried, not only what was found>.
+- Findings: behavioural (fixed, then re-verified in a new context) vs
+  description/mapping (fixed and disclosed, no new round).
+- Fixed after the last verified state, therefore unverified: <list | none>.
 
 ### Skipped layers
 - <layer>: <reason>  (or "none")
