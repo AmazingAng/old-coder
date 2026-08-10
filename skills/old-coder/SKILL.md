@@ -24,8 +24,8 @@ basis of trust.
 
 ```
 SPEC → (human approves spec, not code) → RED → GREEN → REFACTOR → GAUNTLET → EVIDENCE
-                                          ↑_____________________|
-                                              repeat per behavior
+                                          ↑_____________________|          ↘ [VERIFY] ↗
+                                              repeat per behavior         Tier 3, capped
 ```
 
 ### 1. SPEC — the only thing the human reads before code
@@ -106,7 +106,7 @@ or a tool is unavailable, record that in the evidence report with the reason.
 | Full test suite | regressions | project's test command, zero NEW failures (baseline note below) |
 | Static types | whole classes of bugs | tsc / mypy / etc., zero new errors |
 | Lint + format | latent bugs, drift | project's linter, zero new warnings |
-| Coverage on changed lines | untested code paths | every changed/added line executed by a test; branch coverage where the tool supports it. Global % is vanity — changed-line coverage is the constraint |
+| Coverage on changed lines | untested code paths | every changed/added line executed by a test; branch coverage where the tool supports it. Global % is vanity — changed-line coverage is the constraint. **This layer must exit nonzero when its threshold is missed** (`--cov-fail-under`, `diff-cover --fail-under`, equivalent): a layer that prints a percentage and exits 0 is a report, not a gauntlet layer, and it will sit there green while coverage falls |
 | Mutation testing | tests that assert nothing | see `references/gauntlet.md`. No mutation tool? Do manual mutation: introduce 3–5 plausible bugs into the new code one at a time (flip a comparison, off-by-one a bound, drop a condition, return early); the suite must kill every one. Restore after |
 | Property-based tests | edge cases you didn't imagine | for parsing, math, serialization, anything with invariants (round-trip, idempotence, ordering) — add hypothesis/fast-check properties |
 | Complexity budget | unmaintainable output | new functions small and single-purpose; if a function needs a paragraph to explain, split it |
@@ -137,7 +137,17 @@ gate code is a hard failure of the layer, never a pass; no `|| true`, no
 its pass**: run it once against a known-bad input (a negative control) and
 watch it fail — the RED principle applied to checkers, exactly like the
 throwaway mutant for an immediately-passing test. Record the control in
-EVIDENCE.
+EVIDENCE. Be precise about what that buys: **a negative control proves one
+known-bad case reaches the checker's failure path. It does not prove the
+checker recognizes every violation of the constraint it claims to enforce.**
+A grep gate can fail closed perfectly and still guard a spelling rather than
+a behavior. When the gate's coverage is narrower than the rule it serves, say
+so where the rule is written, rather than letting the rule imply more.
+
+Prove a negative control is itself non-vacuous the same way you prove a test:
+temporarily remove or break the defence it validates, and watch the control go
+red. A control that passes with the defence removed is measuring nothing —
+this is a one-time proof, not a permanent extra layer.
 
 Equivalent-mutant note — with a mutation tool, a survivor is not automatically
 a failure: some mutants are semantically equivalent to the original and cannot
@@ -146,7 +156,46 @@ EVIDENCE rather than adding a meaningless test to kill them — that would
 violate anti-gaming rule 4. Hand-written mutants (the manual procedure) get no
 such excuse: you chose them, so choose real bugs.
 
-### 6. EVIDENCE — the only thing the human reads after code
+### 6. VERIFY — fresh-context adversarial pass (Tier 3, experimental)
+
+One agent authored the spec, the tests, the implementation, the checkers, and
+the report that grades them. VERIFY adds a second agent at the end, with a
+fresh context, that attacks the work before EVIDENCE is finalized. It reduces
+**task-context** correlation — your framing, your justifications, the
+assumption you carried since turn 3. If the verifier runs on the same model
+or model family, model-level blind spots remain; a different model narrows
+those too. Neither is independence in a strong sense, and EVIDENCE says so.
+
+Marked experimental: it is expensive, and the evidence for it so far is one
+case study (`references/verifier.md`), not a benchmark.
+
+The non-negotiable rules — **the protocol is `references/verifier.md`, and
+VERIFY has not been performed until that file has been read in full and
+executed. Missing or unreadable → `blocked`, never `passed`.**
+
+- **Tier 3 runs it by default.** Skipping is a declared reduction in EVIDENCE,
+  never a silent one.
+- **Fresh context, four inputs only**: the task contract (the request plus
+  every requirement the human has approved since), the approved SPEC, the repo
+  at an exact source state, the gauntlet entry point. Never your conversation.
+- **Blind first, compare second.** The verifier reproduces and attacks alone,
+  records what it found, and only then sees the draft EVIDENCE. That record is
+  append-only afterwards.
+- **It fixes nothing.** A verifier that patches code becomes an author. A SPEC
+  gap goes back to the **human**, never to the builder to self-amend.
+- **Grade the findings, or this never terminates.** A **behavioural** finding
+  (the code does the wrong thing; a gate cannot fail) is fixed and re-verified
+  in a *new* verifier context. A **description or mapping** finding (the spec,
+  a comment, or EVIDENCE says something untrue about code that is correct) is
+  fixed and disclosed, and does **not** buy another round. Without this split,
+  "fix every finding" times "re-verify after every change" is a loop that ends
+  only when a round returns the empty set — and prose has no such fixpoint.
+- **Cap the rounds.** Two by default; more needs explicit human approval.
+- **Four states in EVIDENCE**: `passed` finalizes; `failed` and `blocked`
+  (verification could not be completed) do not; `not performed` finalizes only
+  as a declared downgrade, following the same rule as an unapproved spec.
+
+### 7. EVIDENCE — the only thing the human reads after code
 
 End with a report the human can trust without opening a single source file
 (template in `references/gauntlet.md`):
@@ -212,6 +261,8 @@ Scale effort to blast radius, and say which tier you chose:
   (tool-based if available) + adversarial pass — one explicit step trying to
   break your own implementation with hostile inputs before declaring done.
   Failure modes deliberately not covered go in EVIDENCE as known limits.
+  Then add VERIFY (§6): the adversarial pass is you attacking your own work
+  and shares your blind spots; a fresh context does not.
 
 ## Setup
 
