@@ -111,11 +111,11 @@ change" is a loop that terminates only when a round returns the empty set.
 Prose has no such fixpoint.
 
 **Be clear about the trade.** Grading buys termination by giving up
-completeness. A behavioural gap can live inside a round you chose not to run —
-in the case study below, the round that would have been skipped under this
-rule is the one that found an unpinned threshold magnitude. That is the price,
-and it is worth paying, because the alternative is a process with no stopping
-condition at all. Say in EVIDENCE which rounds were not run.
+completeness. A behavioural gap can live inside a round you chose not to run,
+and that is not hypothetical — it has happened at least once, in the run
+written up in `verifier-case-study.md`. The price is worth paying because the
+alternative is a process with no stopping condition at all. Say in EVIDENCE
+which rounds were not run.
 
 Cap at two rounds by default. More needs explicit human approval, recorded.
 The cap does not stop the spending; it makes the spending someone's decision,
