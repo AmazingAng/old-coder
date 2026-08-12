@@ -56,8 +56,22 @@ implementation files:
   must record `spec approval: not obtained (autonomous run)` and claim
   correspondingly lower confidence; the spec becomes the artifact the human
   reviews after the fact.
+- **An answer to a question is not an approval.** If you asked the human to
+  decide something, they answered that question and nothing else. Their answer
+  is an INPUT to the spec, and it CHANGES the spec — so any approval you held
+  before the question is approval of a document that no longer exists. Questions
+  and approval are two exchanges, in that order: fold the answers in, say what
+  changed, show the revised spec, ask again. If you cannot quote the words that
+  approved THIS spec, you do not have approval — an answer to your question, a
+  "go ahead" about some other step, silence, and the request that started the
+  task are none of them approval. The recommended-option shape makes this easy
+  to get wrong: when the human picks the options you recommended, the spec looks
+  unchanged and consent looks implied, and neither is true.
 - The spec is append-only during the task. If implementation reveals the spec was
   wrong, say so explicitly and revise it visibly — never silently drift.
+- **Write the spec to a file and name it by absolute path.** A relative path is
+  not clickable in a terminal, so the human cannot open the one artifact they
+  are being asked to approve. Same for EVIDENCE when you get there.
 
 ### 2. RED — prove each test can fail
 
