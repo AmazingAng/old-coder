@@ -120,6 +120,23 @@ dependency diff so the human can see exactly what the agent pulled in.
 
 ## Manual mutation procedure (any language, no tool)
 
+**Reach for the project's mutation tool first.** A real tool generates mutants
+from the syntax tree, so it cannot apply a mutant to code that has moved and it
+cannot report a mutant it did not run. A hand-written mutant list matched
+against source text is a second copy of the code: it goes stale on every
+refactor of the thing it guards, and it fails in the one direction no gauntlet
+can catch. Use the procedure below when no tool exists for the language, not as
+a default.
+
+**A hand-rolled runner must prove it executed each mutant.** This is the sharp
+edge, and this repo's own demo found it: two same-size mutants written in the
+same second shared a bytecode cache, so the runner reported kills for mutants it
+never executed. That class of defect can *only* inflate the score, which means
+it can never surface as a red gauntlet — the layer stays green precisely because
+it is broken. `tools/mutants.py` now guards against it (mtime pinning, a cache
+check that aborts the run); any runner written from this procedure needs the
+equivalent, and EVIDENCE should say which check proves execution.
+
 Script this rather than hand-editing, and **persist the script in the repo**
 (e.g. `tools/mutants.py`): it holds the original source, applies each mutant by
 unique string replacement, runs the suite, and restores. Hand-editing N times
