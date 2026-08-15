@@ -74,7 +74,7 @@ Effort scales with risk: a typo fix runs a couple of checks; anything touching m
 
 The agent grades its own homework, so the rules are strict: never weaken a test to make it pass; never report a check that didn't run; anything unverified is labeled `unverified`, never `pass`; if no human approved the spec, the report must say so and claim less confidence.
 
-And one limit stated plainly: the gauntlet proves the code meets the spec — it cannot prove the spec covers everything that matters. That's why the spec goes to you.
+And one limit stated plainly: the gauntlet turns the constraints expressed in the spec into executable evidence; it cannot prove the spec is complete or authenticate its own checkers and mappings. That's why you approve the SPEC, and why EVIDENCE reports bounded, auditable confidence rather than absolute proof.
 
 ## What's in the repo
 
@@ -83,7 +83,7 @@ skills/old-coder/         the skill (SKILL.md + references/gauntlet.md)
 demo-rate-limiter/        a rate limiter built end-to-end under the skill
 ```
 
-The demo's `evidence.md` is the point of the exercise: 17 tests, 100% branch coverage of the code, 8/8 planted bugs caught — and the process found a real bug the tests had missed (a `NaN` time window slipping through validation). Rerun the whole report:
+The demo's `evidence.md` is the point of the exercise: 41 tests, 100% coverage (49/49 statements and 20/20 branches), and 22/22 planted bugs caught. More importantly, fresh-context verification of earlier green states still found real behavioral defects and an unsound mutation runner — evidence that a green gauntlet is not self-authenticating. The current report discloses both the fixes and the final state's verification status. Rerun the whole report:
 
 ```sh
 cd demo-rate-limiter

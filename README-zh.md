@@ -79,7 +79,7 @@ flowchart LR
 
 agent 是在给自己的作业打分，所以规则很严：不许为通过而弱化测试；不许报告没跑过的检查；没验证的条目只能标 `unverified`，不许标 `pass`；如果没有人批准过 spec，报告必须如实写明，并降低置信声明。
 
-还有一条明说的边界：关卡能证明代码符合 spec——但无法证明 spec 覆盖了所有重要的事。所以 spec 才要交给你。
+还有一条明说的边界：关卡把 spec 中表达的约束转化为可执行证据；它既不能证明 spec 完整，也不能自行证明 checker 和映射可靠。所以 SPEC 要由你批准，证据报告给出的只能是有边界、可审计的置信，而不是绝对证明。
 
 ## 仓库里有什么
 
@@ -88,7 +88,7 @@ skills/old-coder/         skill 本体（SKILL.md + references/gauntlet.md）
 demo-rate-limiter/        按此 skill 端到端做出来的限流器示例
 ```
 
-demo 的 `evidence.md` 就是重点：17 个测试、代码 100% 分支覆盖、8/8 个埋入的 bug 全部被抓——过程中还发现了一个测试没抓到的真 bug（`NaN` 时间窗口穿过了参数校验）。整份报告可以重跑：
+demo 的 `evidence.md` 就是重点：41 个测试、100% 覆盖率（49/49 个语句、20/20 个分支），22/22 个埋入的 bug 全部被抓。更重要的是，对此前绿色状态进行的 fresh-context verification 仍发现了真实的行为缺陷和一个不可靠的 mutation runner——这恰好说明，关卡全绿并不能自证其可信。当前报告同时披露了修复情况和最终源码状态的验证状态。整份报告可以重跑：
 
 ```sh
 cd demo-rate-limiter
