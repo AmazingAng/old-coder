@@ -1,28 +1,33 @@
 # Evidence Report — Sliding-Window Rate Limiter (Tier 3)
 
-- Spec approval: **obtained** for REVISION 4 (2026-08-09) and REVISION 5
-  (2026-08-18) — the human approved each contract change before
+- Spec approval: **obtained** for REVISION 4 (2026-08-09), REVISION 5 and
+  REVISION 6 (2026-08-18) — the human approved each contract change before
   implementation. Earlier revisions (2026-07-25, 2026-07-27) were autonomous
   and are still unapproved; treat them as the weaker part of the spec.
 - Independent verification: **not performed against the final source state
-  `d45cc2f`.** Six earlier rounds were performed; the last verified state
+  `49e8762`.** Six earlier rounds were performed; the last verified state
   `d0b506c` returned `failed`, and the fixes made since — one of them
   behavioural — are disclosed below as unverified. This report is finalized as
   a **declared downgrade**, not on the strength of a passing verdict. A
   verdict attaches to the state a verifier actually saw, and no verifier has
   seen this one.
-- Source state: source commit `d45cc2f`; sha256 tree hash
-  `76389992f4e342e2` — reproduce both with `./tools/source_state.sh` from any
-  directory. The script separately reports current HEAD; commits after
-  `d45cc2f` that touch only this report or other out-of-scope paths preserve
-  the source commit and tree hash. The manifest includes `.github/workflows`,
-  which decides whether the gauntlet runs in CI at all.
+- Source state: source commit `49e8762`; sha256 tree hash
+  `2226ed2dfeddb76c` — reproduce both with `./tools/source_state.sh` from any
+  directory. When a binding is produced the tree hash is the required content
+  identity; the source commit is provenance and is supplied only where
+  complete history is available, so a shallow checkout reports
+  `(unavailable: shallow history)` and a no-Git archive reports `(no git)`,
+  both alongside this same tree hash. No error path emits a binding at all.
+  The script separately reports current HEAD; commits after `49e8762` that
+  touch only this report or other out-of-scope paths preserve the source
+  commit and tree hash. The manifest includes `.github/workflows`, which
+  decides whether the gauntlet runs in CI at all.
 - Toolchain: pinned in `requirements-dev.txt` (local run: Python 3.14.3;
   CI runs the same gauntlet on 3.12 via `.github/workflows/gauntlet.yml`).
 - Entry point: `./tools/gauntlet.sh` reruns every layer below.
 
 All numbers are from one final fresh run of the entry point, executed
-2026-08-18 at source commit `d45cc2f` after the last code edit.
+2026-08-18 at source commit `49e8762` after the last code edit.
 
 `spec.md` was deliberately pruned back to a contract before REVISION 5
 (339 → 255 lines). Every clause, invariant, obligation and failure-model row
@@ -65,6 +70,8 @@ Status legend: pass / fail / unverified / n-a.
 | Must NOT: the limiter is never driven by a real clock | layer: must-not scan in `tools/gauntlet.sh` over tests/ → no matches | pass |
 | failure-model row: allow() is atomic | test_ratelimiter.py::test_allow_is_atomic_a_second_caller_cannot_interleave + M13 | pass |
 | REVISION 5: source binding is reproducible and fail-closed | test_source_state.py (ignored artifacts, staged/unstaged/untracked/deleted inputs, clean clone, no-Git archive, arbitrary cwd, evidence-only commit) | pass |
+| REVISION 6: truncated history withholds provenance, never invents it | test_source_state.py::test_shallow_history_withholds_provenance (exact marker, shallow HEAD, tree equal to the full clone, empty stderr) | pass |
+| REVISION 6: every error path pins its reason and emits no binding | test_source_state.py (Git dirty, Git deletion, Git untracked, no-Git missing input, no-Git empty scope — each asserts the reason and `stdout == ""`) | pass |
 
 ## Gauntlet (final fresh run: `./tools/gauntlet.sh`)
 
@@ -153,9 +160,55 @@ independently verified**:
   was changed, but it is a large edit to the document a verifier attacks
   hardest, and it was made after the last verified state;
 - REVISION 5 and the reproducible, fail-closed source-state mechanism in
-  commits `86bfcf4` and `d45cc2f`.
+  commits `86bfcf4` and `d45cc2f`;
+- REVISION 6 and the shallow-history provenance repair in commits `3e45e16`
+  and `49e8762`.
 
 ## Honest notes
+
+- **The REVISION 5 binding shipped a provenance defect, and CI published it
+  twice.** `source commit` was defined as the most recent commit that changed
+  the source scope, but the command never checked whether the repository held
+  enough history to answer. In a shallow repository `git log` attributes the
+  scope to the grafted HEAD, so the command returned a real-looking commit
+  that had not touched the source — at exit 0, with no warning. Because
+  `actions/checkout@v4` defaults to `fetch-depth: 1`, the canonical CI was
+  exactly the environment that ran it wrongly:
+
+  | Run | Reported source commit | Truth |
+  |---|---|---|
+  | PR #12 check (temporary merge checkout) | `a4276a2` | `d45cc2f` |
+  | post-merge `main` | `57ebbbb` | `d45cc2f` |
+
+  The tree hash `76389992f4e342e2` was correct in both runs, so the content
+  binding held throughout; only the provenance label was wrong. It failed in
+  the direction that looks fine — plausible SHA, exit 0, gauntlet green — and
+  no layer could catch it, because no negative control covered a truncated
+  history. Found by re-deriving the binding in a `--depth 1` clone during
+  review of REVISION 5, not by the gauntlet. REVISION 6 makes truncated
+  history report `(unavailable: shallow history)`, adds the missing control,
+  and sets `fetch-depth: 0` so CI exercises the real path instead of sitting
+  permanently in the degraded one.
+
+- **Three of the REVISION 5 negative controls were weaker than they read.**
+  The wrapper exits 2 when Python cannot find the implementation, so
+  `assert returncode != 0` proved nothing about which guard fired;
+  `test_missing_manifest_input_fails_closed` asserted only that, and would
+  have passed against a completely broken script. It also mis-described
+  itself: under Git a deleted tracked input is reported as *dirty*, and the
+  `source input is missing` guard it appeared to cover is unreachable in the
+  Git path. It is renamed, every control now pins its reason and asserts
+  `stdout == ""`, and two new controls exercise that guard in the no-Git
+  manifest where it actually lives.
+
+- **One REVISION 6 change is not covered by a negative control, deliberately
+  disclosed.** The test fixture used to copy the implementation only
+  `if implementation.exists()`, so a deleted implementation would have
+  degraded the fixture silently. It is now copied unconditionally. Reinstating
+  the guard does not turn any test red, because the implementation exists in
+  every tree the suite can reach; the change buys diagnosability, not a
+  provable property, and writing a control for a state the suite cannot enter
+  would cost more than it proves. Recorded rather than counted as verified.
 
 - **The previous source binding was invalid.** The reported tree
   `c80e8cccf0a1ed3a` included four Git-ignored `*.egg-info` files created by
