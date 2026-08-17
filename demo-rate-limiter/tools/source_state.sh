@@ -1,18 +1,6 @@
 #!/bin/sh
-# Print the demo's source state: git commit (if available) and a sha256 tree
-# hash over the source files. Works from any working directory — evidence.md
-# cites this script so the recorded hash is reproducible without ambiguity.
-set -e
-cd "$(dirname "$0")/.."
-if git rev-parse --short HEAD >/dev/null 2>&1; then
-  printf "commit: %s\n" "$(git rev-parse --short HEAD)"
-else
-  printf "commit: (no git)\n"
-fi
-# ../.github/workflows decides whether the gauntlet runs at all in CI, so it
-# belongs in the state the evidence binds to; omitting it let CI config change
-# silently under an unchanged hash.
-tree_hash=$(find src tests tools examples pyproject.toml requirements-dev.txt spec.md \
-  ../.github/workflows \
-  -type f -not -path "*__pycache__*" | sort | xargs shasum -a 256 | shasum -a 256 | cut -c1-16)
-printf "tree:   %s\n" "$tree_hash"
+# Stable entry point for evidence.md; the Python implementation avoids shell
+# pipelines that can hide an intermediate read failure.
+set -eu
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec python3 "$script_dir/source_state.py"

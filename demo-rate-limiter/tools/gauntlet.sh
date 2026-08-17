@@ -13,6 +13,9 @@ PY=.venv/bin
 echo "=== checker self-test ==="
 sh tools/test_gauntlet_checks.sh
 
+echo "=== source-state self-test ==="
+"$PY/pytest" -q tests/test_source_state.py
+
 echo "=== tests + coverage ==="
 # --cov-fail-under makes this layer a gate. Without it the layer printed a
 # percentage and exited 0 no matter how far coverage fell: a fail-open layer
@@ -51,4 +54,6 @@ echo "=== mutation ==="
 "$PY/python" tools/mutants.py
 echo "=== real execution ==="
 "$PY/python" examples/demo.py
+echo "=== source state ==="
+tools/source_state.sh
 echo "=== gauntlet: all layers green ==="

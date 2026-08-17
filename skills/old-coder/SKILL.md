@@ -22,6 +22,12 @@ correlation), and why EVIDENCE reports layered, auditable confidence, never
 absolute proof. Every shortcut you take against the gauntlet destroys the only
 basis of trust.
 
+**Composition with `old-coder-api`:** when both skills apply, this skill owns
+workflow order, SPEC approval, the gauntlet, and EVIDENCE; `old-coder-api` owns
+the HTTP/JSON contract. Run its scope check and API gates while drafting SPEC,
+turn the surviving constraints and risks into acceptance criteria and checks,
+then map those checks into EVIDENCE. Do not run two parallel workflows.
+
 ## The Loop
 
 ```

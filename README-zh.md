@@ -14,17 +14,36 @@ skill 就是纯 markdown，任何能遵循指令的 coding agent 都能用：Cla
 
 ## 安装
 
+安装 `old-coder`：
+
 ```sh
-npx skills add https://github.com/amazingang/old-coder
+npx skills add https://github.com/amazingang/old-coder --skill old-coder
 ```
 
 也可以手动安装：
 
-- **Claude Code**——把 skill 拷进 skills 文件夹，然后用 `/old-coder` 调用，或在"证明它能用"这类请求时让它自动触发：
+- **Claude Code**——把 skill 拷进 skills 文件夹，然后用 `/old-coder` 调用，或让它在高可靠性任务中自动触发：
   ```sh
-  cp -r skills/old-coder ~/.claude/skills/    # 或 <project>/.claude/skills/
+  cp -r skills/old-coder ~/.claude/skills/
+  # 或拷贝到 <project>/.claude/skills/
   ```
-- **其他 agent**——把 `skills/old-coder/SKILL.md` 加进你的 `AGENTS.md`、规则文件或 system prompt，并把 `references/gauntlet.md` 放在旁边备查。
+- **其他 agent**——把 `skills/old-coder/SKILL.md` 加进你的 `AGENTS.md`、规则文件或 system prompt，并将它的 `references/` 目录放在旁边备查。
+
+### 可选配套 skill：`old-coder-api`
+
+仓库还包含一个专门用于 HTTP/JSON API 设计与评审的 skill，在需要兼容性、授权、幂等、分页、限流与可运维性闸门时安装：
+
+```sh
+npx skills add https://github.com/amazingang/old-coder --skill old-coder-api
+```
+
+同时安装两个 skill：
+
+```sh
+npx skills add https://github.com/amazingang/old-coder --skill old-coder --skill old-coder-api
+```
+
+两者同时适用时，`old-coder` 负责流程、批准与证据，`old-coder-api` 负责 API 契约；API 闸门结论进入 SPEC，并由 gauntlet 验证。
 
 
 
@@ -84,8 +103,9 @@ agent 是在给自己的作业打分，所以规则很严：不许为通过而�
 ## 仓库里有什么
 
 ```
-skills/old-coder/         skill 本体（SKILL.md + references/gauntlet.md）
-demo-rate-limiter/        按此 skill 端到端做出来的限流器示例
+skills/old-coder/         可靠编码流程（SKILL.md + references/）
+skills/old-coder-api/     HTTP/JSON API 设计与评审（SKILL.md + references/）
+demo-rate-limiter/        按 old-coder 端到端做出来的限流器示例
 ```
 
 demo 的 `evidence.md` 就是重点：41 个测试、100% 覆盖率（49/49 个语句、20/20 个分支），22/22 个埋入的 bug 全部被抓。更重要的是，对此前绿色状态进行的 fresh-context verification 仍发现了真实的行为缺陷和一个不可靠的 mutation runner——这恰好说明，关卡全绿并不能自证其可信。当前报告同时披露了修复情况和最终源码状态的验证状态。整份报告可以重跑：
