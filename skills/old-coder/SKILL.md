@@ -45,11 +45,11 @@ implementation files:
   line — never silently absent from the mapping.
 - The spec doubles as the authorization point: include the **setup plan** —
   tools to install, git usage (init? checkpoint commit cadence?), files the
-  gauntlet will add, and **every new dependency with a one-line justification**
-  (prefer the standard library and deps already present; an unjustified
-  package is a spec defect) — so approving the spec authorizes the environment
-  changes in one step instead of N interruptions, and the human can veto a
-  risky package before it is ever installed.
+  gauntlet will add **by path**, and **every new dependency with a one-line
+  justification** (prefer the standard library and deps already present; an
+  unjustified package is a spec defect) — so approving the spec authorizes the
+  environment changes in one step instead of N interruptions, and the human can
+  veto a risky package before it is ever installed.
 - Show the spec to the human in plain language and get approval **before writing
   implementation**. In autonomous mode, state the spec in your response and
   proceed — but the correlation-breaking review never happened, so EVIDENCE
@@ -73,6 +73,12 @@ implementation files:
   not clickable in a terminal, so the human cannot open the one artifact they
   are being asked to approve. Same for EVIDENCE when you get there. The SPEC
   and Gherkin templates are in `references/templates.md`.
+- **Commit the spec at approval** where the repo's git conventions allow it —
+  the setup plan is where that was authorized. Once the approved spec is a
+  commit, later drift is literally a `git diff`. Without a durable spec, a
+  compaction loses the approved contract while the code it authorized remains,
+  and nobody can check whether a scenario was quietly dropped from the EVIDENCE
+  mapping.
 
 ### 2. RED — prove each test can fail
 

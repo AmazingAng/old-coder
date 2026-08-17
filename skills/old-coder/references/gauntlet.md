@@ -185,7 +185,7 @@ record the control in EVIDENCE's honest notes.
 
 ## Templates
 
-The Gherkin scenario template, the SPEC template, the EVIDENCE report template,
-and the tracker roll-up live in `references/templates.md`. This file is read
-while building the gauntlet; that one is read while writing the two artifacts
-the human reads.
+The Gherkin scenario template, the SPEC template, and the EVIDENCE report
+template live in `references/templates.md`. This file is read while building
+the gauntlet; that one is read while writing the two artifacts the human
+reads.

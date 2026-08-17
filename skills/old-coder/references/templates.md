@@ -11,7 +11,6 @@ Written before any implementation file is touched.
 # SPEC — <task name>
 
 - Tier: <1|2|3>
-- Issue: <tracker id, or "none"> <!-- optional; no dependency on any tracker -->
 - Setup plan:
   - Tools to install: <or "none">
   - Git: <init? checkpoint commit cadence? commit flags the repo mandates>
@@ -34,12 +33,6 @@ Written before any implementation file is touched.
 a promise. Without somewhere to write the revision, a spec that changed
 mid-task and a spec that never changed are the same document, and a reader
 cannot tell which one they are holding.
-
-Commit `SPEC.md` at approval where the repo's git conventions allow it — the
-setup plan is where that was authorized. Once the approved spec is a commit,
-later drift is literally a `git diff`. Without a durable spec, a compaction
-loses the approved contract while the code it authorized remains, and nobody
-can check whether a scenario was quietly dropped from the EVIDENCE mapping.
 
 **If the human rejects the spec**, revise `SPEC.md` in place, add the reason to
 `## Revisions`, and re-request approval. Do not delete it and start clean —
@@ -79,8 +72,6 @@ scenario so the evidence report's spec→test mapping is mechanical.
   **against the final source state** — a state no verifier saw is
   `not performed` however many rounds preceded it (Tier 3; protocol in
   `verifier.md`)
-- Tracker: <issue id — roll-up posted | roll-up written to ROLLUP.md, not
-  posted (nobody present to approve it) | none: SPEC named no issue>
 
 ### Spec → Test mapping
 Status is one of: **pass / fail / unverified / n-a**. A row mapped to
@@ -159,37 +150,3 @@ already applies to attack lists — say what you tried, not only what you found.
 **Why name the blind spot.** A layer a project cannot run at all otherwise
 reads as absent rather than accepted. Stating it converts a silent gap into a
 known limit the reader can price in.
-
-## Tracker roll-up (only when the SPEC names an issue)
-
-Tracker linkage is **bidirectional and tracker-agnostic**: the SPEC header
-carries an issue ID, and on completion a short roll-up goes back to that issue.
-No hard dependency on any particular tracker — if the SPEC's `Issue` field says
-`none`, this step does not exist.
-
-Write it to `ROLLUP.md` alongside the spec and evidence files. Post it to the
-issue only if an approver says so; with nobody present, leave it on disk and
-say so in EVIDENCE. A hosted tracker notifies people and cannot be un-sent, so
-it gets the same gate as a commit.
-
-```markdown
-- Built: <one or two lines — what now exists that did not before>
-- Left undone: <deliberate omissions, and why they were deliberate>
-- Traps for the next task: <the thing that will bite whoever picks this up>
-- Evidence: <path to SPEC.md, EVIDENCE.md, logs/>
-```
-
-**Why it is short, and why it is not a copy of EVIDENCE.** The two serve
-different readers, and keeping them distinct is what stops them drifting into
-rival sources of truth:
-
-| | Reader | Obligation |
-|---|---|---|
-| EVIDENCE | the human reviewing **this** change | complete — every layer, every number, every limit |
-| Tracker roll-up | whoever picks up the **next** task | short — what changed the ground under them, and where to find the rest |
-
-A tracker whose notes are append-only by API gives the spec's no-silent-drift
-property for free: an earlier note cannot be quietly rewritten to match a later
-story. Where the tracker permits editing, that property is not there and the
-git-commit-at-SPEC mechanism remains the enforcement — the roll-up is a
-convenience for the next reader, never the authoritative record.

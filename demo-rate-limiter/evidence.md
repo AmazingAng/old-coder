@@ -14,9 +14,9 @@
 - Source state: git commit `8b88bda`; sha256 tree hash `c80e8cccf0a1ed3a` —
   reproduce both with `./tools/source_state.sh` (works from any directory;
   now includes `.github/workflows`, which decides whether the gauntlet runs
-  in CI at all). Commits after `8b88bda` on this branch touch only
-  `skills/`, which is outside the hashed tree — hence the same hash at a
-  later HEAD, not a stale binding.
+  in CI at all). Commits after `8b88bda` touch only paths outside the hashed
+  tree — `skills/`, the READMEs, `CONTRIBUTING.md`, and this report itself —
+  hence the same hash at a later HEAD, not a stale binding.
 - Toolchain: pinned in `requirements-dev.txt` (local run: Python 3.14.3;
   CI runs the same gauntlet on 3.12 via `.github/workflows/gauntlet.yml`).
 - Entry point: `./tools/gauntlet.sh` reruns every layer below.
