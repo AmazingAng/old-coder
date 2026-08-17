@@ -4,8 +4,6 @@ These examples calibrate decisions, not current facts about third-party APIs. Th
 
 ## Existing public OpenAPI diff: safety versus compatibility
 
-Input excerpt:
-
 ```text
 41  -        display_name: { type: string }
 41  +        name: { type: string }
@@ -25,11 +23,14 @@ Scope: public · existing
 - A formerly valid request now fails without a new header — openapi.yaml:75
   Fix: accept the key optionally in this version, generate it by default in official
   SDKs, and require it only in a new major contract or new safer operation.
-Verified outside the diff: Blast radius ✓ — `createTransfer` inherits write-tier limits, recovery headers, and a per-consumer killswitch — gateway/limits.yaml:88.
 
-### Gates: Boring ? (unverified: route convention not in diff) · Compatibility ✗ · Authentication ? (unverified: not in diff) · Authorization ? (unverified: not in diff) · Idempotency ✓ (required key) · Blast radius ✓ · Pagination N/A (not a collection) · Expensive fields ? (unverified: response cost not in diff) · No implementation leakage ? (unverified: response shape not in diff)
+### Verified context
+
+- Idempotency ✓ — supplied keys are atomically claimed with the transfer; repeats replay the original status and body, a different request hash is rejected, and records survive the documented retry window — transfers/idempotency.ts:52-81.
+- Blast radius ✓ — `createTransfer` inherits write-tier limits, recovery headers, and a per-consumer killswitch — gateway/limits.yaml:88.
+
+### Gates: Boring ? (unverified: route convention not in diff) · Compatibility ✗ · Authentication ? (unverified: not in diff) · Authorization ? (unverified: not in diff) · Idempotency ✓ (verified contract) · Blast radius ✓ · Pagination N/A (not a collection) · Expensive fields ? (unverified: response cost not in diff) · No implementation leakage ? (unverified: response shape not in diff)
 ```
-
 The submitted diff passes Idempotency but fails Compatibility. Making the key optional preserves compatibility but leaves duplicate protection incomplete until a new operation or major contract can require it. Record both states explicitly: compatibility outranks the tempting retroactive fix, but the additive migration is not the final idempotency solution.
 
 ## Greenfield proposal: fix the resource model first
