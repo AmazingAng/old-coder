@@ -2,29 +2,50 @@
   <img src="assets/old-coder-github-banner.png" alt="old-coder: SPEC → GAUNTLET → EVIDENCE">
 </p>
 
-# Old Coder skill（老码农 skill）
+# Old Coder skills（老码农 skills）
 
 *[中文说明 →](README-zh.md)*
 
 **An old coder's strategy for the agent era: don't read the code — make it run the gauntlet.**
 
-A skill that makes coding agents **prove their work**. Instead of you reading every line the agent writes, the agent must push its code through a gauntlet of checks — and hand you a test plan before coding and an evidence report after. You review those two documents, not the code.
+Two complementary skills with distinct responsibilities:
+
+- **`old-coder`** makes coding agents prove their work. Instead of you reading every line, the agent pushes its code through a gauntlet of checks and hands you a test plan before coding and an evidence report after.
+- **`old-coder-api`** designs, changes, and reviews HTTP/JSON APIs with compatibility, authorization, idempotency, pagination, rate limits, and operability gates.
+
+When both apply, `old-coder` owns workflow, approval, and evidence; `old-coder-api` owns the API contract, and its gate decisions become SPEC constraints and gauntlet checks.
 
 It's plain markdown, so it works with any coding agent that follows instructions: Claude Code, Codex CLI, Cursor, Aider, or your own agent loop.
 
 ## Installation
 
+Choose skills interactively:
+
 ```sh
 npx skills add https://github.com/amazingang/old-coder
 ```
 
+Install one explicitly:
+
+```sh
+npx skills add https://github.com/amazingang/old-coder --skill old-coder
+npx skills add https://github.com/amazingang/old-coder --skill old-coder-api
+```
+
+Install both explicitly:
+
+```sh
+npx skills add https://github.com/amazingang/old-coder --skill old-coder --skill old-coder-api
+```
+
 Or manually:
 
-- **Claude Code** — copy the skill into a skills folder, then invoke `/old-coder` or let it trigger on "prove it works"-style requests:
+- **Claude Code** — copy either or both skills into a skills folder, then invoke `/old-coder` or `/old-coder-api`, or let them trigger from the task:
   ```sh
-  cp -r skills/old-coder ~/.claude/skills/    # or <project>/.claude/skills/
+  cp -r skills/old-coder skills/old-coder-api ~/.claude/skills/
+  # or copy them to <project>/.claude/skills/
   ```
-- **Other agents** — add `skills/old-coder/SKILL.md` to your `AGENTS.md`, rules file, or system prompt, and keep `references/gauntlet.md` alongside it.
+- **Other agents** — add the relevant `SKILL.md` to your `AGENTS.md`, rules file, or system prompt, and keep that skill's `references/` directory alongside it.
 
 ## The idea
 
@@ -79,8 +100,9 @@ And one limit stated plainly: the gauntlet turns the constraints expressed in th
 ## What's in the repo
 
 ```
-skills/old-coder/         the skill (SKILL.md + references/gauntlet.md)
-demo-rate-limiter/        a rate limiter built end-to-end under the skill
+skills/old-coder/         reliable coding workflow (SKILL.md + references/)
+skills/old-coder-api/     HTTP/JSON API design and review (SKILL.md + references/)
+demo-rate-limiter/        a rate limiter built end-to-end under old-coder
 ```
 
 The demo's `evidence.md` is the point of the exercise: 41 tests, 100% coverage (49/49 statements and 20/20 branches), and 22/22 planted bugs caught. More importantly, fresh-context verification of earlier green states still found real behavioral defects and an unsound mutation runner — evidence that a green gauntlet is not self-authenticating. The current report discloses both the fixes and the final state's verification status. Rerun the whole report:

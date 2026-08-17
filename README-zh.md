@@ -2,29 +2,50 @@
   <img src="assets/old-coder-github-banner-zh.png" alt="old-coder：SPEC → 关卡 → 证据">
 </p>
 
-# old-coder skill（老码农 skill）
+# old-coder skills（老码农 skills）
 
 > 本文是 [README.md](README.md) 的中文版。
 
 **老码农在 Agent 时代的智慧：不读代码，让代码闯过层层关卡。**
 
-一个让 coding agent **自证其码**的 skill。你不用逐行读 agent 写的代码——agent 必须让代码闯过一整套检查关卡，并且在写代码前交给你一份测试计划、写完后交给你一份证据报告。你审的是这两份文档，不是代码。
+仓库包含两个职责明确、可组合使用的 skill：
+
+- **`old-coder`** 让 coding agent 自证其码：代码必须闯过一整套检查关卡，并在写代码前提交测试计划、写完后提交证据报告。
+- **`old-coder-api`** 用兼容性、授权、幂等、分页、限流和可运维性闸门设计、修改与评审 HTTP/JSON API。
+
+两者同时适用时，`old-coder` 负责流程、批准与证据，`old-coder-api` 负责 API 契约；API 闸门结论进入 SPEC，并由 gauntlet 验证。
 
 skill 就是纯 markdown，任何能遵循指令的 coding agent 都能用：Claude Code、Codex CLI、Cursor、Aider，或你自己的 agent loop。
 
 ## 安装
 
+交互选择要安装的 skill：
+
 ```sh
 npx skills add https://github.com/amazingang/old-coder
 ```
 
+明确安装其中一个：
+
+```sh
+npx skills add https://github.com/amazingang/old-coder --skill old-coder
+npx skills add https://github.com/amazingang/old-coder --skill old-coder-api
+```
+
+明确同时安装两个：
+
+```sh
+npx skills add https://github.com/amazingang/old-coder --skill old-coder --skill old-coder-api
+```
+
 也可以手动安装：
 
-- **Claude Code**——把 skill 拷进 skills 文件夹，然后用 `/old-coder` 调用，或在"证明它能用"这类请求时让它自动触发：
+- **Claude Code**——把任意一个或两个 skill 拷进 skills 文件夹，然后用 `/old-coder`、`/old-coder-api` 调用，或让它们按任务自动触发：
   ```sh
-  cp -r skills/old-coder ~/.claude/skills/    # 或 <project>/.claude/skills/
+  cp -r skills/old-coder skills/old-coder-api ~/.claude/skills/
+  # 或拷贝到 <project>/.claude/skills/
   ```
-- **其他 agent**——把 `skills/old-coder/SKILL.md` 加进你的 `AGENTS.md`、规则文件或 system prompt，并把 `references/gauntlet.md` 放在旁边备查。
+- **其他 agent**——把所需 skill 的 `SKILL.md` 加进你的 `AGENTS.md`、规则文件或 system prompt，并将对应的 `references/` 目录放在旁边备查。
 
 
 
@@ -84,8 +105,9 @@ agent 是在给自己的作业打分，所以规则很严：不许为通过而�
 ## 仓库里有什么
 
 ```
-skills/old-coder/         skill 本体（SKILL.md + references/gauntlet.md）
-demo-rate-limiter/        按此 skill 端到端做出来的限流器示例
+skills/old-coder/         可靠编码流程（SKILL.md + references/）
+skills/old-coder-api/     HTTP/JSON API 设计与评审（SKILL.md + references/）
+demo-rate-limiter/        按 old-coder 端到端做出来的限流器示例
 ```
 
 demo 的 `evidence.md` 就是重点：41 个测试、100% 覆盖率（49/49 个语句、20/20 个分支），22/22 个埋入的 bug 全部被抓。更重要的是，对此前绿色状态进行的 fresh-context verification 仍发现了真实的行为缺陷和一个不可靠的 mutation runner——这恰好说明，关卡全绿并不能自证其可信。当前报告同时披露了修复情况和最终源码状态的验证状态。整份报告可以重跑：
