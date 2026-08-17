@@ -29,6 +29,12 @@ EXCLUDED_DIRS = {
     "__pycache__",
 }
 EXCLUDED_FILES = {".coverage", ".DS_Store", "coverage.xml"}
+NO_GIT = "(no git)"
+# Provenance is withheld whenever history is truncated, even if the source
+# commit happens to lie inside the fetched depth: a shallow repository cannot
+# prove from the inside that the boundary was not crossed, and guessing is how
+# the grafted HEAD came to be reported as the source commit in the first place.
+SHALLOW = "(unavailable: shallow history)"
 
 
 def _git(
@@ -53,6 +59,15 @@ def _git_root() -> Path | None:
         root, "ls-files", "--error-unmatch", "--", relative_script, check=False
     )
     return root if tracked.returncode == 0 else None
+
+
+def _is_shallow(root: Path) -> bool:
+    probe = _git(root, "rev-parse", "--is-shallow-repository", check=False)
+    if probe.returncode != 0:
+        # Predates the flag, or the probe itself failed: withhold provenance
+        # rather than assume complete history.
+        return True
+    return os.fsdecode(probe.stdout).strip() == "true"
 
 
 def _manifest_from_git(root: Path) -> list[str]:
@@ -154,13 +169,16 @@ def main() -> int:
             ).strip()
             if head != head_before:
                 raise RuntimeError("HEAD changed while hashing")
-            source_commit = os.fsdecode(
-                _git(root, "log", "-1", "--format=%h", "--", *SCOPES).stdout
-            ).strip()
-            if not source_commit:
-                raise RuntimeError("no commit contains the source manifest")
+            if _is_shallow(root):
+                source_commit = SHALLOW
+            else:
+                source_commit = os.fsdecode(
+                    _git(root, "log", "-1", "--format=%h", "--", *SCOPES).stdout
+                ).strip()
+                if not source_commit:
+                    raise RuntimeError("no commit contains the source manifest")
         else:
-            head = source_commit = "(no git)"
+            head = source_commit = NO_GIT
             tree = _tree_hash(root, _manifest_without_git(root))
     except (OSError, subprocess.CalledProcessError, RuntimeError, ValueError) as error:
         print(f"source-state error: {error}", file=sys.stderr)

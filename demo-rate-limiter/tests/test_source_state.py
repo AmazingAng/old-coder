@@ -43,10 +43,11 @@ def _fixture_repo(tmp_path: Path) -> Path:
     (demo / "spec.md").write_text("# fixture spec\n")
     (demo / "src/ratelimiter/__init__.py").write_text("VALUE = 1\n")
     (demo / "tests/test_fixture.py").write_text("def test_fixture(): pass\n")
+    # Copied unconditionally: a fixture that tolerates a missing implementation
+    # turns every control below into a test of the shell wrapper's failure to
+    # find a file, which exits 2 for the same reason a real fault would.
     shutil.copy2(TOOLS / "source_state.sh", demo / "tools/source_state.sh")
-    implementation = TOOLS / "source_state.py"
-    if implementation.exists():
-        shutil.copy2(implementation, demo / "tools/source_state.py")
+    shutil.copy2(TOOLS / "source_state.py", demo / "tools/source_state.py")
 
     _git(repo, "init", "-q")
     _git(repo, "config", "user.name", "Source State Test")
@@ -54,6 +55,15 @@ def _fixture_repo(tmp_path: Path) -> Path:
     _git(repo, "add", ".")
     _git(repo, "commit", "-qm", "fixture")
     return repo
+
+
+def _archive(repo: Path, destination: Path) -> Path:
+    """Copy the tracked files out of `repo`, leaving no Git metadata behind."""
+    for relative in _git(repo, "ls-files").stdout.splitlines():
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(repo / relative, target)
+    return destination
 
 
 def _run_state(
@@ -73,6 +83,20 @@ def _state(result: subprocess.CompletedProcess[str]) -> dict[str, str]:
     assert result.returncode == 0, result.stderr
     state = dict(line.split(":", 1) for line in result.stdout.splitlines())
     return {key.strip(): value.strip() for key, value in state.items()}
+
+
+def _assert_failed_closed(
+    result: subprocess.CompletedProcess[str], reason: str
+) -> None:
+    """Pin the failure reason, not merely a non-zero exit.
+
+    The wrapper exits 2 when Python cannot find the implementation at all, so
+    an exit status on its own proves nothing about which guard fired. stdout
+    must stay empty: a caller that sees any binding line may rely on success.
+    """
+    assert result.returncode != 0
+    assert reason in result.stderr.lower()
+    assert result.stdout == ""
 
 
 def test_ignored_build_products_do_not_change_tree_hash(tmp_path: Path) -> None:
@@ -95,34 +119,80 @@ def test_dirty_tracked_source_fails_closed(tmp_path: Path) -> None:
     source = repo / "demo-rate-limiter/src/ratelimiter/__init__.py"
     source.write_text("VALUE = 2\n")
 
-    result = _run_state(repo)
-
-    assert result.returncode != 0
-    assert "dirty" in result.stderr.lower()
+    _assert_failed_closed(_run_state(repo), "dirty")
 
     _git(repo, "add", "demo-rate-limiter/src/ratelimiter/__init__.py")
-    staged_result = _run_state(repo)
-    assert staged_result.returncode != 0
-    assert "dirty" in staged_result.stderr.lower()
+    _assert_failed_closed(_run_state(repo), "dirty")
 
 
 def test_nonignored_untracked_source_fails_closed(tmp_path: Path) -> None:
     repo = _fixture_repo(tmp_path)
     (repo / "demo-rate-limiter/src/ratelimiter/new.py").write_text("VALUE = 2\n")
 
-    result = _run_state(repo)
-
-    assert result.returncode != 0
-    assert "untracked" in result.stderr.lower()
+    _assert_failed_closed(_run_state(repo), "untracked")
 
 
-def test_missing_manifest_input_fails_closed(tmp_path: Path) -> None:
+def test_deleted_tracked_input_fails_closed(tmp_path: Path) -> None:
+    """Git reports a deleted tracked input as dirty, not as a missing input.
+
+    The `source input is missing` guard belongs to the no-Git manifest and is
+    unreachable here; pinning the wrong reason would have made this control
+    pass for a fault it never exercised.
+    """
     repo = _fixture_repo(tmp_path)
     (repo / "demo-rate-limiter/pyproject.toml").unlink()
 
-    result = _run_state(repo)
+    _assert_failed_closed(_run_state(repo), "dirty")
 
-    assert result.returncode != 0
+
+def test_no_git_missing_input_fails_closed(tmp_path: Path) -> None:
+    archive = _archive(_fixture_repo(tmp_path), tmp_path / "archive")
+    (archive / "demo-rate-limiter/pyproject.toml").unlink()
+
+    _assert_failed_closed(_run_state(archive), "source input is missing")
+
+
+def test_no_git_empty_scope_fails_closed(tmp_path: Path) -> None:
+    archive = _archive(_fixture_repo(tmp_path), tmp_path / "archive")
+    for stale in (archive / "demo-rate-limiter/examples").iterdir():
+        stale.unlink()
+
+    _assert_failed_closed(_run_state(archive), "source scope has no input")
+
+
+def test_shallow_history_withholds_provenance(tmp_path: Path) -> None:
+    """A truncated history must degrade the provenance, not invent one.
+
+    Before REVISION 6 `git log` attributed the scope to the grafted HEAD, so a
+    shallow checkout emitted a real-looking source commit at exit 0. Asserting
+    only "not the true commit" would still admit that bug; the marker and the
+    surrounding output are pinned exactly.
+    """
+    repo = _fixture_repo(tmp_path)
+    (repo / "README.md").write_text("evidence only\n")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-qm", "evidence only")
+    full = _state(_run_state(repo))
+
+    shallow = tmp_path / "shallow"
+    subprocess.run(
+        ["git", "clone", "-q", "--depth", "1", repo.as_uri(), str(shallow)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    truncated = _git(shallow, "rev-parse", "--is-shallow-repository").stdout
+    assert truncated.strip() == "true"
+
+    result = _run_state(shallow)
+    state = _state(result)
+
+    assert result.returncode == 0
+    assert result.stderr == ""
+    assert state["source commit"] == "(unavailable: shallow history)"
+    assert state["source commit"] != full["source commit"]
+    assert state["head"] == _git(shallow, "rev-parse", "--short", "HEAD").stdout.strip()
+    assert state["tree"] == full["tree"]
 
 
 def test_clean_archive_matches_git_from_any_directory(tmp_path: Path) -> None:
@@ -136,12 +206,7 @@ def test_clean_archive_matches_git_from_any_directory(tmp_path: Path) -> None:
         text=True,
     )
     clone_state = _state(_run_state(clone, cwd=clone / "demo-rate-limiter/tests"))
-    archive = tmp_path / "archive"
-    for relative in _git(repo, "ls-files").stdout.splitlines():
-        source = repo / relative
-        destination = archive / relative
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, destination)
+    archive = _archive(repo, tmp_path / "archive")
 
     archive_state = _state(_run_state(archive, cwd=archive / "demo-rate-limiter/src"))
 
