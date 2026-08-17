@@ -1,34 +1,34 @@
 # Evidence Report — Sliding-Window Rate Limiter (Tier 3)
 
-- Spec approval: **obtained** for REVISION 4 (2026-08-09) — the human approved
-  each contract change item by item before implementation. Earlier revisions
-  (2026-07-25, 2026-07-27) were autonomous and are still unapproved; treat
-  them as the weaker part of the spec.
+- Spec approval: **obtained** for REVISION 4 (2026-08-09) and REVISION 5
+  (2026-08-18) — the human approved each contract change before
+  implementation. Earlier revisions (2026-07-25, 2026-07-27) were autonomous
+  and are still unapproved; treat them as the weaker part of the spec.
 - Independent verification: **not performed against the final source state
-  `8b88bda`.** Six earlier rounds were performed; the last verified state
+  `d45cc2f`.** Six earlier rounds were performed; the last verified state
   `d0b506c` returned `failed`, and the fixes made since — one of them
   behavioural — are disclosed below as unverified. This report is finalized as
   a **declared downgrade**, not on the strength of a passing verdict. A
   verdict attaches to the state a verifier actually saw, and no verifier has
   seen this one.
-- Source state: git commit `8b88bda`; sha256 tree hash `c80e8cccf0a1ed3a` —
-  reproduce both with `./tools/source_state.sh` (works from any directory;
-  now includes `.github/workflows`, which decides whether the gauntlet runs
-  in CI at all). Commits after `8b88bda` touch only paths outside the hashed
-  tree — `skills/`, the READMEs, `CONTRIBUTING.md`, and this report itself —
-  hence the same hash at a later HEAD, not a stale binding.
+- Source state: source commit `d45cc2f`; sha256 tree hash
+  `76389992f4e342e2` — reproduce both with `./tools/source_state.sh` from any
+  directory. The script separately reports current HEAD; commits after
+  `d45cc2f` that touch only this report or other out-of-scope paths preserve
+  the source commit and tree hash. The manifest includes `.github/workflows`,
+  which decides whether the gauntlet runs in CI at all.
 - Toolchain: pinned in `requirements-dev.txt` (local run: Python 3.14.3;
   CI runs the same gauntlet on 3.12 via `.github/workflows/gauntlet.yml`).
 - Entry point: `./tools/gauntlet.sh` reruns every layer below.
 
 All numbers are from one final fresh run of the entry point, executed
-2026-08-10 after the last code edit.
+2026-08-18 at source commit `d45cc2f` after the last code edit.
 
-`spec.md` was deliberately pruned back to a contract afterwards (339 → 255
-lines). Every clause, invariant, obligation and failure-model row survives;
-what was removed is the per-revision forensics, which lives in the honest
-notes below and in git. The spec is the artifact a human reads before any
-code exists, and it had stopped being readable as one.
+`spec.md` was deliberately pruned back to a contract before REVISION 5
+(339 → 255 lines). Every clause, invariant, obligation and failure-model row
+survived; what was removed is the per-revision forensics, which lives in the
+honest notes below and in git. REVISION 5 adds the approved source-binding
+contract and tests without changing rate-limiter behaviour.
 
 ## Spec → Test mapping
 
@@ -64,24 +64,27 @@ Status legend: pass / fail / unverified / n-a.
 | Must NOT: denials store nothing (no memory growth) | test_ratelimiter.py::test_must_not_denials_store_nothing + M8 | pass |
 | Must NOT: the limiter is never driven by a real clock | layer: must-not scan in `tools/gauntlet.sh` over tests/ → no matches | pass |
 | failure-model row: allow() is atomic | test_ratelimiter.py::test_allow_is_atomic_a_second_caller_cannot_interleave + M13 | pass |
+| REVISION 5: source binding is reproducible and fail-closed | test_source_state.py (ignored artifacts, staged/unstaged/untracked/deleted inputs, clean clone, no-Git archive, arbitrary cwd, evidence-only commit) | pass |
 
 ## Gauntlet (final fresh run: `./tools/gauntlet.sh`)
 
 | Layer | Command | Result |
 |---|---|---|
 | Checker self-test | `sh tools/test_gauntlet_checks.sh` (first layer; asserts the must-not scan fails on a planted pattern, passes on a clean tree, and fails closed with a distinct rc 2 when the scan itself breaks) | 3/3 expectations ok |
+| Source-state self-test | `pytest -q tests/test_source_state.py` (negative controls for ambient ignored artifacts and every fail-closed branch; clean clone and no-Git archive comparison) | 6/6 passed |
 | Mutation harness negative control | `python tools/mutants.py --negative-control` (a killer and a strictly-equivalent mutant of identical size under one pinned mtime) | C1 KILLED, C2 SURVIVED — ok |
-| Tests | `pytest -q --cov=ratelimiter` | 41 passed, 0 failed |
-| Types | `mypy src tests examples tools` (strict) | 0 errors in 6 files |
-| Lint + format + complexity | `ruff check . && ruff format --check .` (mccabe ≤ 8) | 0 warnings, 8 files formatted |
+| Tests | `pytest -q --cov=ratelimiter` | 47 passed, 0 failed |
+| Types | `mypy src tests examples tools` (strict) | 0 errors in 8 files |
+| Lint + format + complexity | `ruff check . && ruff format --check .` (mccabe ≤ 8) | 0 warnings, 10 files formatted |
 | Changed-line coverage | `pytest --cov … --cov-fail-under=100` | 49/49 statements, 20/20 branches (100%). **This layer is a gate**; before 2026-08-09 it printed a percentage and exited 0 no matter how far coverage fell |
 | Mutation | `python tools/mutants.py` (manual, scripted; only pytest exit 1 counts as a kill; `__pycache__` cleared and `PYTHONDONTWRITEBYTECODE` set per mutant) | 22/22 killed |
 | Property-based | hypothesis, 2 properties | 100 examples each, 0 falsified |
 | Real execution | `python examples/demo.py` (real `time.monotonic`) | burst of 5 → `[True, True, True, False, False]`; other key unaffected; allowed again after window |
 | Supply chain | `pip-audit -r requirements-dev.txt` | no known vulnerabilities; runtime dependencies: **none** (stdlib only; `threading` is stdlib) |
 | Secret scan | must-not scan in `tools/gauntlet.sh` over src, tests, tools, examples, spec.md, pyproject.toml, requirements-dev.txt and `../.github` | clean, no matches |
+| Source binding | `tools/source_state.sh` (last gauntlet layer) | HEAD/source commit `d45cc2f`; tree `76389992f4e342e2` |
 | License check | — | n-a: zero runtime dependencies, nothing redistributed beyond this repo's own MIT code |
-| Suite health | pytest-randomly (order shuffled every run) | 41 passed in randomized order, 10/10 consecutive runs |
+| Suite health | pytest-randomly (order shuffled every run) | 47 passed in randomized order, 10/10 consecutive runs |
 
 ## Layer attribution
 
@@ -148,9 +151,24 @@ independently verified**:
 - the six prose corrections listed in commit `66df5cd`;
 - the prune of `spec.md` from 339 to 255 lines in commit `8b88bda`. No clause
   was changed, but it is a large edit to the document a verifier attacks
-  hardest, and it was made after the last verified state.
+  hardest, and it was made after the last verified state;
+- REVISION 5 and the reproducible, fail-closed source-state mechanism in
+  commits `86bfcf4` and `d45cc2f`.
 
 ## Honest notes
+
+- **The previous source binding was invalid.** The reported tree
+  `c80e8cccf0a1ed3a` included four Git-ignored `*.egg-info` files created by
+  `pip install -e .`; a clean checkout at the cited commit instead produced
+  `939188446f61289c`. Because those generated files can also vary with the
+  setuptools version, neither hash was a trustworthy Git-source binding. The
+  old `find | sort | xargs | shasum` pipeline could additionally print success
+  after a missing input. REVISION 5 replaces it with a canonical tracked-file
+  manifest, explicit dirty/untracked rejection, structured path+content
+  hashing, a deterministic no-Git fallback, six negative controls, and a
+  second clean-state check around hashing. The corrected source binding is
+  `d45cc2f` / `76389992f4e342e2`; it is gauntlet-tested but not independently
+  verified.
 
 - **The A/B experiment that started this failed.** The design was to plant a
   defect in one copy and verify a clean copy as a false-positive control. The
