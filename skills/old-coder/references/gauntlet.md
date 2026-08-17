@@ -183,77 +183,9 @@ into a vacuous pass. Prove each home-grown check can fail with a one-off
 negative control (feed it a known-bad fixture; make its input unreadable) and
 record the control in EVIDENCE's honest notes.
 
-## Gherkin scenario template (for the SPEC step)
+## Templates
 
-```gherkin
-Feature: <capability in user language>
-  Scenario: <one concrete behavior>
-    Given <concrete starting state>
-    When  <concrete action with concrete input>
-    Then  <concrete observable outcome, exact values>
-
-  Scenario: <the error case>
-    Given ...
-    When  <invalid/hostile input>
-    Then  <exact error type/message/status, and what state must NOT change>
-```
-
-Each scenario maps 1:1 to at least one automated test; name the test after the
-scenario so the evidence report's spec→test mapping is mechanical.
-
-## Evidence report template (for the EVIDENCE step)
-
-```markdown
-## Evidence Report — <task name> (Tier <1|2|3>)
-
-- Spec approval: <obtained from user | not obtained (autonomous run) —
-  confidence downgraded; spec is the artifact to review after the fact>
-- Source state: <commit SHA | no git: sha256 tree hash> — persist the
-  computation as a script (e.g. tools/source_state.sh); a hash recipe written
-  in prose is working-directory-sensitive and will fail to reproduce
-- Toolchain: <pinned versions file, e.g. requirements-dev.txt>
-- Entry point: <single command that reruns every layer>
-- Independent verification: <not performed | passed | failed | blocked>
-  **against the final source state** — a state no verifier saw is
-  `not performed` however many rounds preceded it (Tier 3; protocol in
-  `verifier.md`)
-
-### Spec → Test mapping
-Status is one of: **pass / fail / unverified / n-a**. A row mapped to
-"skipped: <reason>" must carry unverified or n-a — never pass.
-
-| Scenario | Test | Status |
-|---|---|---|
-| <scenario name> | <test file>::<test name> | pass |
-| Must NOT: <negative constraint> | <test / layer / skipped: reason> | pass \| unverified |
-
-### Gauntlet (final fresh run)
-| Layer | Command | Result |
-|---|---|---|
-| Tests | <cmd> | <N> passed, 0 failed |
-| Types | <cmd> | 0 errors |
-| Lint | <cmd> | 0 warnings |
-| Changed-line coverage | <cmd> | <covered>/<total> changed lines (list any misses) |
-| Mutation | <tool or "manual"> | <killed>/<total> killed |
-| Property-based | <cmd> | <N> properties, <examples/property> examples each |
-| Real execution | <cmd> | <observed output> |
-| Supply chain | <cmd> | 0 known vulns; new deps: none (or list, each ↔ SPEC justification) |
-| Suite health | <cmd> | randomized order (seed <n>), all passed |
-
-### Independent verification (never omit; see verifier.md)
-- Verifier: <host / model family>; fresh context; which inputs it received;
-  what correlation that breaks and what it does not.
-- Rounds: <n> (cap <m>); verdict per round, each against the state it saw.
-- Grading: who classified each finding behavioural vs description, and who
-  approved stopping.
-- Attacked: <what was tried, not only what was found>.
-- Findings: behavioural (fixed, then re-verified in a new context) vs
-  description/mapping (fixed and disclosed, no new round).
-- Fixed after the last verified state, therefore unverified: <list | none>.
-
-### Skipped layers
-- <layer>: <reason>  (or "none")
-
-### Honest notes
-- <failures hit during the task and how they were resolved; spec revisions; anything reducing confidence>
-```
+The Gherkin scenario template, the SPEC template, the EVIDENCE report template,
+and the tracker roll-up live in `references/templates.md`. This file is read
+while building the gauntlet; that one is read while writing the two artifacts
+the human reads.

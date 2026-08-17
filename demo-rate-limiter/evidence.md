@@ -92,13 +92,17 @@ Status legend: pass / fail / unverified / n-a.
 - Scenario suite alone: **22/22**. The headline mutation score is carried
   entirely by the scenario tests.
 
-## Skipped layers
+## Layers not run as specified
 
-- Tool-based mutation (mutmut): unverified compatibility with Python 3.14;
-  replaced with the scripted manual procedure (`tools/mutants.py`, 22 mutants).
-- Shell lint (shellcheck) for the four scripts that implement half the gates:
-  **not run**, no tool installed. Every Python file gets three static layers
-  and the shell gets none. Known gap, raised by verification round 4.
+- **SUBSTITUTED — tool-based mutation (mutmut):** unverified compatibility with
+  Python 3.14; the scripted manual procedure ran instead (`tools/mutants.py`,
+  22 mutants). What it cannot detect: the mutant list is hand-written, so
+  unlike a tool generating mutants from the syntax tree it can only test
+  weaknesses somebody thought of in advance.
+- **UNAVAILABLE — shell lint (shellcheck)** for the four scripts that implement
+  half the gates: no tool installed, and nothing ran in its place. Every Python
+  file gets three static layers and the shell gets none. Known gap, raised by
+  verification round 4.
 
 ## Independent verification
 

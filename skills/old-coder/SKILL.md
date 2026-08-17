@@ -71,7 +71,8 @@ implementation files:
   wrong, say so explicitly and revise it visibly — never silently drift.
 - **Write the spec to a file and name it by absolute path.** A relative path is
   not clickable in a terminal, so the human cannot open the one artifact they
-  are being asked to approve. Same for EVIDENCE when you get there.
+  are being asked to approve. Same for EVIDENCE when you get there. The SPEC
+  and Gherkin templates are in `references/templates.md`.
 
 ### 2. RED — prove each test can fail
 
@@ -175,7 +176,7 @@ such excuse: you chose them, so choose real bugs.
 ### 6. EVIDENCE — the only thing the human reads after code
 
 End with a report the human can trust without opening a single source file
-(template in `references/gauntlet.md`):
+(template in `references/templates.md`):
 
 - The approved spec, with each behavior mapped to the test that verifies it.
 - Each gauntlet layer: the command run, and its actual result (pasted numbers,
