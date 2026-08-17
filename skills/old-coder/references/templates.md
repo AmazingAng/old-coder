@@ -65,7 +65,10 @@ scenario so the evidence report's spec→test mapping is mechanical.
   confidence downgraded; spec is the artifact to review after the fact>
 - Source state: <commit SHA | no git: sha256 tree hash> — persist the
   computation as a script (e.g. tools/source_state.sh); a hash recipe written
-  in prose is working-directory-sensitive and will fail to reproduce
+  in prose is working-directory-sensitive and will fail to reproduce. When
+  Git exists, derive the tree hash from version-controlled inputs, fail on
+  relevant staged, unstaged, deleted, or non-ignored untracked files, and
+  never hash ambient ignored build artifacts
 - Toolchain: <pinned versions file, e.g. requirements-dev.txt>
 - Entry point: <single command that reruns every layer>
 - Independent verification: <not performed | passed | failed | blocked>
