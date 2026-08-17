@@ -286,6 +286,59 @@ not change rate-limiter runtime behaviour or its public API.
   evidence rebinding third. Independent verification remains `not performed`
   unless a separate verifier actually inspects the final source state.
 
+## REVISION 6 — shallow-history provenance and grounded negative controls (Tier 3)
+
+Approved 2026-08-18. This revision repairs a provenance defect introduced by
+REVISION 5 and grounds the negative controls that guard it; it does not change
+rate-limiter runtime behaviour or its public API.
+
+REVISION 5 reported the most recent commit that changed the source scope
+without checking whether the repository holds enough history to answer. In a
+shallow repository `git log` attributes the scope to the grafted HEAD, so the
+command emitted a real-looking commit that had not touched the source — at
+exit 0, with no warning. The canonical CI runs a shallow checkout, so the one
+environment that executes this automatically was the one reporting it wrongly.
+
+### Behaviour
+
+- The two outputs carry different obligations. **When a binding is produced,
+  the tree hash is the required content identity; the source commit is
+  provenance and is supplied only when complete history is available.** No
+  error path emits a binding at all.
+- In a shallow repository the command still succeeds: it reports HEAD and the
+  tree hash, and reports the source commit as the exact marker
+  `(unavailable: shallow history)`.
+- That degradation is deliberately conservative. A shallow repository reports
+  the marker even when the source commit happens to lie inside the fetched
+  depth, because truncation cannot be disproved from inside the repository.
+  Guessing here would reintroduce the defect for a narrower input.
+- No error path writes anything to standard output. A caller that sees any
+  binding line can rely on the command having succeeded.
+- The canonical CI checks out complete history, so the source-commit path is
+  exercised for real rather than permanently degraded.
+
+### Must NOT do
+
+- Do not report any commit as the source commit when history is truncated.
+- Do not treat an exit status alone as proof of which failure occurred; a
+  negative control must pin the reason.
+- Do not let a test fixture continue when the implementation under test is
+  absent — a fixture that degrades silently cannot be a negative control.
+- Do not add a runtime or development dependency for this repair.
+
+### Setup plan
+
+- Modify `tools/source_state.py` (shallow detection and marker) and
+  `.github/workflows/gauntlet.yml` (`fetch-depth: 0`). Extend
+  `tests/test_source_state.py`: a shallow negative control asserting the full
+  output contract, two no-Git error-path controls, `stdout == ""` on every
+  error path, the Git deletion control renamed to what it actually exercises,
+  and unconditional copying of the implementation into the fixture.
+- No new files, no new dependencies.
+- Commit cadence: this approved SPEC first; implementation, tests and CI
+  configuration second; evidence rebinding third. Independent verification
+  remains `not performed` unless a separate verifier inspects the final state.
+
 ## Revision history
 
 Revisions 1–3 (2026-07-25 → 07-27) were made autonomously during the original
