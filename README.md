@@ -2,50 +2,48 @@
   <img src="assets/old-coder-github-banner.png" alt="old-coder: SPEC → GAUNTLET → EVIDENCE">
 </p>
 
-# Old Coder skills（老码农 skills）
+# Old Coder skill（老码农 skill）
 
 *[中文说明 →](README-zh.md)*
 
 **An old coder's strategy for the agent era: don't read the code — make it run the gauntlet.**
 
-Two complementary skills with distinct responsibilities:
-
-- **`old-coder`** makes coding agents prove their work. Instead of you reading every line, the agent pushes its code through a gauntlet of checks and hands you a test plan before coding and an evidence report after.
-- **`old-coder-api`** designs, changes, and reviews HTTP/JSON APIs with compatibility, authorization, idempotency, pagination, rate limits, and operability gates.
-
-When both apply, `old-coder` owns workflow, approval, and evidence; `old-coder-api` owns the API contract, and its gate decisions become SPEC constraints and gauntlet checks.
+A skill that makes coding agents **prove their work**. Instead of you reading every line, the agent pushes its code through a gauntlet of checks and hands you a test plan before coding and an evidence report after. You review those two documents, not the code.
 
 It's plain markdown, so it works with any coding agent that follows instructions: Claude Code, Codex CLI, Cursor, Aider, or your own agent loop.
 
 ## Installation
 
-Choose skills interactively:
-
-```sh
-npx skills add https://github.com/amazingang/old-coder
-```
-
-Install one explicitly:
+Install `old-coder`:
 
 ```sh
 npx skills add https://github.com/amazingang/old-coder --skill old-coder
+```
+
+Or manually:
+
+- **Claude Code** — copy the skill into a skills folder, then invoke `/old-coder` or let it trigger on high-assurance requests:
+  ```sh
+  cp -r skills/old-coder ~/.claude/skills/
+  # or copy it to <project>/.claude/skills/
+  ```
+- **Other agents** — add `skills/old-coder/SKILL.md` to your `AGENTS.md`, rules file, or system prompt, and keep its `references/` directory alongside it.
+
+### Optional companion: `old-coder-api`
+
+This repository also includes a focused HTTP/JSON API design and review skill. Install it when you want compatibility, authorization, idempotency, pagination, rate-limit, and operability gates:
+
+```sh
 npx skills add https://github.com/amazingang/old-coder --skill old-coder-api
 ```
 
-Install both explicitly:
+To install both skills:
 
 ```sh
 npx skills add https://github.com/amazingang/old-coder --skill old-coder --skill old-coder-api
 ```
 
-Or manually:
-
-- **Claude Code** — copy either or both skills into a skills folder, then invoke `/old-coder` or `/old-coder-api`, or let them trigger from the task:
-  ```sh
-  cp -r skills/old-coder skills/old-coder-api ~/.claude/skills/
-  # or copy them to <project>/.claude/skills/
-  ```
-- **Other agents** — add the relevant `SKILL.md` to your `AGENTS.md`, rules file, or system prompt, and keep that skill's `references/` directory alongside it.
+When both apply, `old-coder` owns workflow, approval, and evidence; `old-coder-api` owns the API contract, and its gate decisions become SPEC constraints and gauntlet checks.
 
 ## The idea
 

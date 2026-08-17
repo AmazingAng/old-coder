@@ -2,50 +2,48 @@
   <img src="assets/old-coder-github-banner-zh.png" alt="old-coder：SPEC → 关卡 → 证据">
 </p>
 
-# old-coder skills（老码农 skills）
+# old-coder skill（老码农 skill）
 
 > 本文是 [README.md](README.md) 的中文版。
 
 **老码农在 Agent 时代的智慧：不读代码，让代码闯过层层关卡。**
 
-仓库包含两个职责明确、可组合使用的 skill：
-
-- **`old-coder`** 让 coding agent 自证其码：代码必须闯过一整套检查关卡，并在写代码前提交测试计划、写完后提交证据报告。
-- **`old-coder-api`** 用兼容性、授权、幂等、分页、限流和可运维性闸门设计、修改与评审 HTTP/JSON API。
-
-两者同时适用时，`old-coder` 负责流程、批准与证据，`old-coder-api` 负责 API 契约；API 闸门结论进入 SPEC，并由 gauntlet 验证。
+一个让 coding agent **自证其码**的 skill。你不用逐行读 agent 写的代码——agent 必须让代码闯过一整套检查关卡，并且在写代码前交给你一份测试计划、写完后交给你一份证据报告。你审的是这两份文档，不是代码。
 
 skill 就是纯 markdown，任何能遵循指令的 coding agent 都能用：Claude Code、Codex CLI、Cursor、Aider，或你自己的 agent loop。
 
 ## 安装
 
-交互选择要安装的 skill：
-
-```sh
-npx skills add https://github.com/amazingang/old-coder
-```
-
-明确安装其中一个：
+安装 `old-coder`：
 
 ```sh
 npx skills add https://github.com/amazingang/old-coder --skill old-coder
+```
+
+也可以手动安装：
+
+- **Claude Code**——把 skill 拷进 skills 文件夹，然后用 `/old-coder` 调用，或让它在高可靠性任务中自动触发：
+  ```sh
+  cp -r skills/old-coder ~/.claude/skills/
+  # 或拷贝到 <project>/.claude/skills/
+  ```
+- **其他 agent**——把 `skills/old-coder/SKILL.md` 加进你的 `AGENTS.md`、规则文件或 system prompt，并将它的 `references/` 目录放在旁边备查。
+
+### 可选配套 skill：`old-coder-api`
+
+仓库还包含一个专门用于 HTTP/JSON API 设计与评审的 skill，在需要兼容性、授权、幂等、分页、限流与可运维性闸门时安装：
+
+```sh
 npx skills add https://github.com/amazingang/old-coder --skill old-coder-api
 ```
 
-明确同时安装两个：
+同时安装两个 skill：
 
 ```sh
 npx skills add https://github.com/amazingang/old-coder --skill old-coder --skill old-coder-api
 ```
 
-也可以手动安装：
-
-- **Claude Code**——把任意一个或两个 skill 拷进 skills 文件夹，然后用 `/old-coder`、`/old-coder-api` 调用，或让它们按任务自动触发：
-  ```sh
-  cp -r skills/old-coder skills/old-coder-api ~/.claude/skills/
-  # 或拷贝到 <project>/.claude/skills/
-  ```
-- **其他 agent**——把所需 skill 的 `SKILL.md` 加进你的 `AGENTS.md`、规则文件或 system prompt，并将对应的 `references/` 目录放在旁边备查。
+两者同时适用时，`old-coder` 负责流程、批准与证据，`old-coder-api` 负责 API 契约；API 闸门结论进入 SPEC，并由 gauntlet 验证。
 
 
 
