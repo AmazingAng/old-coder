@@ -245,6 +245,47 @@ table. A row whose catcher cannot be shown to fail is a defect, not a mapping.
   the gap is visible rather than absent.
 - **Distributed / multi-process limiting.** In-process state only.
 
+## REVISION 5 — reproducible source-state binding (Tier 3)
+
+Approved 2026-08-18. This revision repairs the evidence mechanism; it does
+not change rate-limiter runtime behaviour or its public API.
+
+### Behaviour
+
+- In a Git checkout, `tools/source_state.sh` hashes only version-controlled
+  files in the declared source scope. Ignored build products such as
+  `*.egg-info`, bytecode caches and coverage output cannot change the hash.
+- The same tracked content produces the same tree hash in the working tree, a
+  clean checkout and the no-Git archive fallback, regardless of current
+  working directory.
+- In Git, relevant staged changes, unstaged changes, deletions or non-ignored
+  untracked files make the command fail closed instead of emitting a binding.
+- The command reports both current HEAD and the most recent commit that
+  changed the source scope. A later evidence-only commit may change HEAD while
+  preserving the source commit and tree hash.
+- Missing or unreadable manifest inputs make the command fail non-zero; no
+  partial hash may be reported.
+- The gauntlet runs a negative-control self-test for these properties and then
+  emits the source-state binding only after every other layer has passed.
+
+### Must NOT do
+
+- Do not derive a Git binding from ambient ignored files on disk.
+- Do not silently omit a new, non-ignored file inside the source scope.
+- Do not use a hashing pipeline whose intermediate read failure can be hidden
+  by the exit status of its final command.
+- Do not add a runtime or development dependency for this repair.
+
+### Setup plan
+
+- Modify `tools/source_state.sh`; add its implementation and regression tests
+  under `tools/` and `tests/`; connect the self-test and binding to
+  `tools/gauntlet.sh`; clarify the reusable rule in the old-coder evidence
+  template; update `evidence.md` after the implementation commit is clean.
+- Commit cadence: this approved SPEC first; tests plus implementation second;
+  evidence rebinding third. Independent verification remains `not performed`
+  unless a separate verifier actually inspects the final source state.
+
 ## Revision history
 
 Revisions 1–3 (2026-07-25 → 07-27) were made autonomously during the original
