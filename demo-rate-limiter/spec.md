@@ -296,8 +296,9 @@ REVISION 5 reported the most recent commit that changed the source scope
 without checking whether the repository holds enough history to answer. In a
 shallow repository `git log` attributes the scope to the grafted HEAD, so the
 command emitted a real-looking commit that had not touched the source — at
-exit 0, with no warning. The canonical CI runs a shallow checkout, so the one
-environment that executes this automatically was the one reporting it wrongly.
+exit 0, with no warning. Before this revision the canonical CI ran a shallow
+checkout, so the one environment that executed this automatically was the one
+reporting it wrongly.
 
 ### Behaviour
 
