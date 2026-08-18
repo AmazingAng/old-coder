@@ -5,20 +5,20 @@
   Earlier revisions (2026-07-25, 2026-07-27) were autonomous and are still
   unapproved; treat them as the weaker part of the spec.
 - Independent verification: **not performed against the final source state
-  `5b8dc1b`.** Six earlier rounds were performed; the last verified state
+  `42528d9`.** Six earlier rounds were performed; the last verified state
   `d0b506c` returned `failed`, and the fixes made since — one of them
   behavioural — are disclosed below as unverified. This report is finalized as
   a **declared downgrade**, not on the strength of a passing verdict. A
   verdict attaches to the state a verifier actually saw, and no verifier has
   seen this one.
-- Source state: source commit `5b8dc1b`; sha256 tree hash
-  `0bf97ed089bb4775` — reproduce both with `./tools/source_state.sh` from any
+- Source state: source commit `42528d9`; sha256 tree hash
+  `5aa96ec5487c957c` — reproduce both with `./tools/source_state.sh` from any
   directory. When a binding is produced the tree hash is the required content
   identity; the source commit is provenance and is supplied only where
   complete history is available, so a shallow checkout reports
   `(unavailable: shallow history)` and a no-Git archive reports `(no git)`,
   both alongside this same tree hash. No error path emits a binding at all.
-  The script separately reports current HEAD; commits after `5b8dc1b` that
+  The script separately reports current HEAD; commits after `42528d9` that
   touch only this report or other out-of-scope paths preserve the source
   commit and tree hash. The manifest includes `.github/workflows`, which
   decides whether the gauntlet runs in CI at all.
@@ -27,7 +27,7 @@
 - Entry point: `./tools/gauntlet.sh` reruns every layer below.
 
 All numbers are from one final fresh run of the entry point, executed
-2026-08-18 at source commit `5b8dc1b` after the last code edit.
+2026-08-18 at source commit `42528d9` after the last code edit.
 
 `spec.md` was deliberately pruned back to a contract before REVISION 5
 (339 → 255 lines). Every clause, invariant, obligation and failure-model row
@@ -92,7 +92,7 @@ Status legend: pass / fail / unverified / n-a.
 | Real execution | `python examples/demo.py` (real `time.monotonic`) | burst of 5 → `[True, True, True, False, False]`; other key unaffected; allowed again after window |
 | Supply chain | `pip-audit -r requirements-dev.txt` | no known vulnerabilities; runtime dependencies: **none** (stdlib only; `threading` is stdlib) |
 | Secret scan | must-not scan in `tools/gauntlet.sh` over src, tests, tools, examples, spec.md, pyproject.toml, requirements-dev.txt and `../.github` | clean, no matches |
-| Source binding | `tools/source_state.sh` (last gauntlet layer) | source commit `5b8dc1b`; tree `0bf97ed089bb4775`; current HEAD is reported separately |
+| Source binding | `tools/source_state.sh` (last gauntlet layer) | source commit `42528d9`; tree `5aa96ec5487c957c`; current HEAD is reported separately |
 | License check | — | n-a: zero runtime dependencies, nothing redistributed beyond this repo's own MIT code |
 | Suite health | pytest-randomly (order shuffled every run) | 50 passed in randomized order, 10/10 consecutive runs |
 
@@ -166,7 +166,8 @@ independently verified**:
   commits `86bfcf4` and `d45cc2f`;
 - REVISION 6 and the shallow-history provenance repair in commits `3e45e16`
   and `49e8762`, plus the historical CI wording correction in `4734451`;
-- REVISION 7 and the fail-closed gauntlet orchestration in commit `5b8dc1b`.
+- REVISION 7 and the fail-closed gauntlet orchestration in commits `5b8dc1b`
+  and `42528d9`.
 
 ## Honest notes
 
@@ -182,6 +183,17 @@ independently verified**:
   expectations. This catches an accidental omission of a registered layer
   invocation; it does not make a coordinated edit to both the manifest and
   caller impossible.
+
+- **One REVISION 7 control was shallower than the four beside it.** Scenario 5
+  of `test_gauntlet_orchestration.sh` placed `2>&1` outside the command
+  substitution, so the subshell's stderr leaked to the terminal rather than
+  being captured. It asserts only stdout, so no expectation was wrong; but a
+  regression printing the all-green message while also complaining about a
+  missing or failed layer on stderr would have passed that scenario alone.
+  Found in review, not by the control. Fixed in `42528d9`; the five scenarios
+  still pass 13/13 and the fail-open mutation battery still turns them red. The
+  contract in REVISION 7 is unchanged, so this carries no new spec revision —
+  only a rebind, because `tools/` is inside the hashed source scope.
 
 - **REVISION 7 keeps application and instrument assurance distinct.** The
   coverage and mutation targets remain `src/ratelimiter`; they were not widened
