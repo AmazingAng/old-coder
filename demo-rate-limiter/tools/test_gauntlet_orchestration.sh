@@ -85,13 +85,13 @@ expect_contains "$output" "duplicate layer 'mutation'" "duplicate layer is named
 
 # 5. The controls are not a script that can only fail: one successful command
 #    for every expected layer reaches the one legitimate all-green message.
-output=$(
+output=$({
   . tools/gauntlet_layers.sh
   for layer in $GAUNTLET_EXPECTED_LAYERS; do
     run_layer "$layer" true
   done
   finish_gauntlet
-) 2>&1
+} 2>&1)
 rc=$?
 expect_rc 0 "$rc" "complete manifest passes"
 expect_contains "$output" "=== gauntlet: all layers green ===" "complete manifest reports green"
