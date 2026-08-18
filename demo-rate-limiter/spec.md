@@ -340,6 +340,57 @@ reporting it wrongly.
   configuration second; evidence rebinding third. Independent verification
   remains `not performed` unless a separate verifier inspects the final state.
 
+## REVISION 7 — fail-closed gauntlet orchestration (Tier 3)
+
+Approved 2026-08-18. This revision repairs a demonstrated fail-open defect in
+the gauntlet entry point; it does not change rate-limiter runtime behaviour or
+its public API.
+
+Before this revision, deleting a layer command while leaving its heading could
+make `tools/gauntlet.sh` print that heading, perform no work for the layer, exit
+zero and announce that every layer was green. This was reproduced by deleting
+the committed mutation invocation: no mutant ran, but the gauntlet still
+reported success.
+
+### Behaviour
+
+- The gauntlet has a fixed manifest of expected layers and records a layer as
+  complete only after all commands for that layer succeed.
+- A layer command that fails stops the gauntlet immediately, preserves its
+  non-zero status and names the failed layer. Later layers do not run.
+- A successful command sequence that omits any expected layer fails at the
+  final audit and names every missing layer.
+- Unknown and duplicate layer completions fail instead of silently changing or
+  overstating the run.
+- The all-green message is emitted only by the final completion audit, after
+  every expected layer has completed exactly once.
+
+### Must NOT do
+
+- Do not use a printed heading as evidence that a layer ran.
+- Do not rely on `set -e` to stop a command placed on the left side of `&&` or
+  inside another conditional context.
+- Do not extend application coverage or mutation gates across all of `tools/`
+  as a substitute for a control aimed at this orchestration failure mode.
+- Do not claim that one negative control proves a checker recognizes every
+  violation; each control proves only its named known-bad case.
+
+### Setup plan
+
+- Work on branch `codex/issue-13-gauntlet-orchestration`, preserving unrelated
+  untracked assets in the user's checkout.
+- Add `tools/gauntlet_layers.sh` for the expected-layer manifest, execution
+  wrapper and final audit; add `tools/test_gauntlet_orchestration.sh` with
+  controls for an omitted layer and a failed command, plus unknown and
+  duplicate registrations; modify `tools/gauntlet.sh` to use the helper.
+- Clarify the reusable assurance boundary in
+  `skills/old-coder/references/gauntlet.md`: targeted negative controls guard
+  identified fail-open modes in trust-chain tooling, while application
+  coverage and mutation remain scoped to the subject under test.
+- No new dependency. Commit cadence: this approved SPEC first; tests plus
+  implementation second; evidence rebinding third. Independent verification
+  remains `not performed` unless a separate verifier inspects the final state.
+
 ## Revision history
 
 Revisions 1–3 (2026-07-25 → 07-27) were made autonomously during the original
