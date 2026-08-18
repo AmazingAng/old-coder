@@ -5,20 +5,20 @@
   implementation. Earlier revisions (2026-07-25, 2026-07-27) were autonomous
   and are still unapproved; treat them as the weaker part of the spec.
 - Independent verification: **not performed against the final source state
-  `49e8762`.** Six earlier rounds were performed; the last verified state
+  `4734451`.** Six earlier rounds were performed; the last verified state
   `d0b506c` returned `failed`, and the fixes made since — one of them
   behavioural — are disclosed below as unverified. This report is finalized as
   a **declared downgrade**, not on the strength of a passing verdict. A
   verdict attaches to the state a verifier actually saw, and no verifier has
   seen this one.
-- Source state: source commit `49e8762`; sha256 tree hash
-  `2226ed2dfeddb76c` — reproduce both with `./tools/source_state.sh` from any
+- Source state: source commit `4734451`; sha256 tree hash
+  `dbccc212daa35442` — reproduce both with `./tools/source_state.sh` from any
   directory. When a binding is produced the tree hash is the required content
   identity; the source commit is provenance and is supplied only where
   complete history is available, so a shallow checkout reports
   `(unavailable: shallow history)` and a no-Git archive reports `(no git)`,
   both alongside this same tree hash. No error path emits a binding at all.
-  The script separately reports current HEAD; commits after `49e8762` that
+  The script separately reports current HEAD; commits after `4734451` that
   touch only this report or other out-of-scope paths preserve the source
   commit and tree hash. The manifest includes `.github/workflows`, which
   decides whether the gauntlet runs in CI at all.
@@ -27,7 +27,7 @@
 - Entry point: `./tools/gauntlet.sh` reruns every layer below.
 
 All numbers are from one final fresh run of the entry point, executed
-2026-08-18 at source commit `49e8762` after the last code edit.
+2026-08-18 at source commit `4734451` after the last code edit.
 
 `spec.md` was deliberately pruned back to a contract before REVISION 5
 (339 → 255 lines). Every clause, invariant, obligation and failure-model row
@@ -71,16 +71,16 @@ Status legend: pass / fail / unverified / n-a.
 | failure-model row: allow() is atomic | test_ratelimiter.py::test_allow_is_atomic_a_second_caller_cannot_interleave + M13 | pass |
 | REVISION 5: source binding is reproducible and fail-closed | test_source_state.py (ignored artifacts, staged/unstaged/untracked/deleted inputs, clean clone, no-Git archive, arbitrary cwd, evidence-only commit) | pass |
 | REVISION 6: truncated history withholds provenance, never invents it | test_source_state.py::test_shallow_history_withholds_provenance (exact marker, shallow HEAD, tree equal to the full clone, empty stderr) | pass |
-| REVISION 6: every error path pins its reason and emits no binding | test_source_state.py (Git dirty, Git deletion, Git untracked, no-Git missing input, no-Git empty scope — each asserts the reason and `stdout == ""`) | pass |
+| REVISION 6: covered error scenarios pin their reason and emit no binding | test_source_state.py (Git dirty, Git deletion, Git untracked, no-Git missing input, no-Git empty scope — each asserts the reason and `stdout == ""`) | pass |
 
 ## Gauntlet (final fresh run: `./tools/gauntlet.sh`)
 
 | Layer | Command | Result |
 |---|---|---|
 | Checker self-test | `sh tools/test_gauntlet_checks.sh` (first layer; asserts the must-not scan fails on a planted pattern, passes on a clean tree, and fails closed with a distinct rc 2 when the scan itself breaks) | 3/3 expectations ok |
-| Source-state self-test | `pytest -q tests/test_source_state.py` (negative controls for ambient ignored artifacts and every fail-closed branch; clean clone and no-Git archive comparison) | 6/6 passed |
+| Source-state self-test | `pytest -q tests/test_source_state.py` (negative controls for the covered fail-closed scenarios; shallow/full-history, clean clone and no-Git archive comparisons) | 9/9 passed |
 | Mutation harness negative control | `python tools/mutants.py --negative-control` (a killer and a strictly-equivalent mutant of identical size under one pinned mtime) | C1 KILLED, C2 SURVIVED — ok |
-| Tests | `pytest -q --cov=ratelimiter` | 47 passed, 0 failed |
+| Tests | `pytest -q --cov=ratelimiter` | 50 passed, 0 failed |
 | Types | `mypy src tests examples tools` (strict) | 0 errors in 8 files |
 | Lint + format + complexity | `ruff check . && ruff format --check .` (mccabe ≤ 8) | 0 warnings, 10 files formatted |
 | Changed-line coverage | `pytest --cov … --cov-fail-under=100` | 49/49 statements, 20/20 branches (100%). **This layer is a gate**; before 2026-08-09 it printed a percentage and exited 0 no matter how far coverage fell |
@@ -89,9 +89,9 @@ Status legend: pass / fail / unverified / n-a.
 | Real execution | `python examples/demo.py` (real `time.monotonic`) | burst of 5 → `[True, True, True, False, False]`; other key unaffected; allowed again after window |
 | Supply chain | `pip-audit -r requirements-dev.txt` | no known vulnerabilities; runtime dependencies: **none** (stdlib only; `threading` is stdlib) |
 | Secret scan | must-not scan in `tools/gauntlet.sh` over src, tests, tools, examples, spec.md, pyproject.toml, requirements-dev.txt and `../.github` | clean, no matches |
-| Source binding | `tools/source_state.sh` (last gauntlet layer) | HEAD/source commit `d45cc2f`; tree `76389992f4e342e2` |
+| Source binding | `tools/source_state.sh` (last gauntlet layer) | source commit `4734451`; tree `dbccc212daa35442`; current HEAD is reported separately |
 | License check | — | n-a: zero runtime dependencies, nothing redistributed beyond this repo's own MIT code |
-| Suite health | pytest-randomly (order shuffled every run) | 47 passed in randomized order, 10/10 consecutive runs |
+| Suite health | pytest-randomly (order shuffled every run) | 50 passed in randomized order, 10/10 consecutive runs |
 
 ## Layer attribution
 
@@ -162,9 +162,20 @@ independently verified**:
 - REVISION 5 and the reproducible, fail-closed source-state mechanism in
   commits `86bfcf4` and `d45cc2f`;
 - REVISION 6 and the shallow-history provenance repair in commits `3e45e16`
-  and `49e8762`.
+  and `49e8762`, plus the historical CI wording correction in `4734451`.
 
 ## Honest notes
+
+- **The first REVISION 6 evidence rebind was internally stale.** Commit
+  `83004bf` updated the headline source state but left four REVISION 5 values in
+  the gauntlet table: 6 rather than 9 source-state tests, 47 rather than 50
+  total tests, the old `d45cc2f` / `76389992f4e342e2` binding, and a suite-health
+  row for the old 47-test suite. Review caught the mismatch against the same
+  successful CI log the report was meant to summarize. The table now comes
+  from a fresh gauntlet at `4734451`; the 50-test randomized suite was also
+  rerun separately 10/10 times rather than inheriting the old result. Its
+  negative-control wording is narrowed from “every error path” to the five
+  failure scenarios actually exercised.
 
 - **The REVISION 5 binding shipped a provenance defect, and CI published it
   twice.** `source commit` was defined as the most recent commit that changed
