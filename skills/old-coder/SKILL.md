@@ -1,6 +1,6 @@
 ---
 name: old-coder
-description: Evidence-first development — surround the implementation with an executable spec and a gauntlet of constraints (tests, types, coverage, mutation) so line-by-line review becomes optional. Use when the user explicitly asks for high-assurance or evidence-first work ("reliable", "TDD", "prove it works", "I won't read the code"), or when the change touches high-stakes domains (money, auth, data loss, concurrency, public API). For routine changes where the user just wants normal tests, write good tests directly instead of invoking this loop.
+description: Evidence-first development — surround the implementation with an executable spec and a gauntlet of constraints (tests, types, coverage, mutation) so line-by-line review becomes optional. Use when the user explicitly asks for high-assurance or evidence-first work ("reliable", "TDD", "prove it works", "I won't read the code"). Also load it when the user did NOT ask but the change touches a high-stakes domain (money, auth, data loss, concurrency, public API) — in that case the first and only act is to OFFER the loop in one sentence and stop. For routine changes where the user just wants normal tests, write good tests directly instead of invoking this loop.
 ---
 
 # Old Coder: Reliable Coding Under Constraint and Test
@@ -10,6 +10,18 @@ two artifacts you produce: (1) an **executable specification** they approve befo
 you write code, and (2) an **evidence report** proving the code ran the gauntlet.
 Your job is to make those two artifacts trustworthy enough that line-by-line
 review becomes optional within the spec's boundaries.
+
+## First: was this loop asked for?
+
+- **Nobody asked; you loaded this on the high-stakes heuristic** (money, auth,
+  data loss, concurrency, public API): offer in one sentence — name the domain,
+  give two choices (the full loop, or a normal fix with good tests) — then stop.
+- **Create nothing before the answer**: no spec, no setup plan, no branch.
+- **A configured invocation naming this skill IS the ask** (a scheduled wake, a
+  loop prompt, another agent's task) — start at step 1, do not re-offer it.
+- **Nobody to answer?** Never stall. Record the domain and proceed under step 1's
+  autonomous rules, with spec approval `not obtained (autonomous run)`.
+- **The offer is not spec approval** — a yes authorizes the loop, not the spec.
 
 This inverts the normal review model: **trust moves from inspection to
 constraints.** Be honest about what that buys: the gauntlet turns the
