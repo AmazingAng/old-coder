@@ -227,12 +227,12 @@ independently verified**:
   `939188446f61289c`. Because those generated files can also vary with the
   setuptools version, neither hash was a trustworthy Git-source binding. The
   old `find | sort | xargs | shasum` pipeline could additionally print success
-  after a missing input. REVISION 5 replaces it with a canonical tracked-file
+  after a missing input. REVISION 5 replaced it with a canonical tracked-file
   manifest, explicit dirty/untracked rejection, structured path+content
   hashing, a deterministic no-Git fallback, six negative controls, and a
-  second clean-state check around hashing. The corrected source binding is
-  `d45cc2f` / `76389992f4e342e2`; it is gauntlet-tested but not independently
-  verified.
+  second clean-state check around hashing. The binding REVISION 5 produced was
+  `d45cc2f` / `76389992f4e342e2`; it was gauntlet-tested but never independently
+  verified, and REVISION 6 superseded it.
 
 - **The A/B experiment that started this failed.** The design was to plant a
   defect in one copy and verify a clean copy as a false-positive control. The
