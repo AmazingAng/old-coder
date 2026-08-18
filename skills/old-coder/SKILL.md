@@ -297,6 +297,20 @@ until that file has been read in full and executed; missing or unreadable →
 
 ## Setup
 
+**Isolation — do not mutate the user's working tree to do your work.** Declare
+the mechanism in the SPEC, with one line of why: a worktree, a branch, or none —
+the last only at Tier 1, where the blast radius is a typo. The human vetoes the
+mechanism at approval rather than discovering it afterwards.
+
+The trap: **a fresh worktree contains no gitignored content**, so the gauntlet
+often cannot run there until dependencies are rebuilt. Two outcomes are
+acceptable — rebuild and run there, or fall back to a branch and record why.
+Never report green from a tree that never ran the suite.
+
+Where the isolated tree and the tree the change lands in differ by ignored or
+untracked content, say so in EVIDENCE: a green run in a tree missing the landing
+tree's `.env` or build outputs is not evidence about the landing tree.
+
 If the project has no test runner, no linter, or no type checking, set up the
 minimal standard toolchain for the language **first** (see
 `references/gauntlet.md`). A gauntlet can't run on bare ground. Setup changes
