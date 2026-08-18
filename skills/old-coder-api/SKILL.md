@@ -5,7 +5,7 @@ description: Design, change, or review an HTTP/JSON API surface — endpoints, r
 
 # old-coder-api
 
-Distilled from Sean Goedecke, *Everything I know about good API design* (2025-08-24).
+Inspired by Sean Goedecke, *Everything I know about good API design* (2025-08-24).
 
 This skill covers HTTP/JSON contract and operability concerns. Its compatibility rules assume JSON consumers. For gRPC/protobuf, GraphQL, WebSockets, or another protocol, apply the transport-independent principles only alongside that protocol's own compatibility rules. This is not a substitute for a full application-security review.
 
