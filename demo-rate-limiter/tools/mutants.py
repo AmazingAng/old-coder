@@ -1,4 +1,8 @@
-"""Manual mutation testing: apply each mutant, run pytest, restore, report.
+"""Manual mutation testing: apply each mutant, run pytest, report.
+
+Every mutant is written into a throwaway copy of the demo, never into the
+working tree: restoring on exit cannot protect the user's files from SIGTERM,
+SIGKILL or a crash, and a surviving mutant left behind would pass the suite.
 
 Usage: .venv/bin/python tools/mutants.py [pytest-target]
 Exit code 0 iff every mutant is killed. The optional pytest-target narrows the
@@ -9,12 +13,27 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TARGET = ROOT / "src/ratelimiter/__init__.py"
-PYCACHE = TARGET.parent / "__pycache__"
+TARGET_REL = Path("src/ratelimiter/__init__.py")
 PYTEST = ROOT / ".venv/bin/pytest"
+PYTHON = ROOT / ".venv/bin/python"
+SANDBOX_IGNORE = shutil.ignore_patterns(
+    ".venv",
+    "__pycache__",
+    "*.pyc",
+    "*.egg-info",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".hypothesis",
+    ".coverage",
+    "coverage.xml",
+)
 
 # CPython validates a cached .pyc against (source mtime in whole seconds,
 # source size), so two mutants of identical size written inside the same
@@ -25,6 +44,35 @@ PYTEST = ROOT / ".venv/bin/pytest"
 # there is nothing to inherit. The rmtree covers running this script directly
 # on a dirty tree; the tripwire below catches the env var being lost.
 MUTANT_ENV = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+
+
+@contextmanager
+def sandbox() -> Iterator[Path]:
+    """Copy the demo to a temp dir and prove its package is what gets imported.
+
+    The venv holds an editable install pointing at the real src/, so without
+    PYTHONPATH every mutant would run against the unmutated working tree and
+    be reported SURVIVED (or, worse, the copy would be bypassed silently).
+    """
+    with tempfile.TemporaryDirectory(prefix="mutants-") as tmp:
+        work = Path(tmp) / "demo"
+        shutil.copytree(ROOT, work, ignore=SANDBOX_IGNORE, symlinks=True)
+        env = {**MUTANT_ENV, "PYTHONPATH": str(work / "src")}
+        imported = subprocess.run(
+            [str(PYTHON), "-c", "import ratelimiter; print(ratelimiter.__file__)"],
+            cwd=work,
+            capture_output=True,
+            text=True,
+            env=env,
+            check=True,
+        ).stdout.strip()
+        if Path(imported).resolve() != (work / TARGET_REL).resolve():
+            raise RuntimeError(
+                f"sandbox is not what gets imported: {imported} — mutants "
+                "would run against the working tree"
+            )
+        yield work
+
 
 MUTANTS = [
     (
@@ -195,7 +243,12 @@ CONTROL = [
 
 
 def run_mutant(
-    original: str, old: str, new: str, pytest_target: str, pin_mtime: float = 0.0
+    work: Path,
+    original: str,
+    old: str,
+    new: str,
+    pytest_target: str,
+    pin_mtime: float = 0.0,
 ) -> int:
     """Apply one mutant and return pytest's exit code, with no stale bytecode.
 
@@ -203,18 +256,20 @@ def run_mutant(
     mutants to one mtime makes the (mtime, size) collision deterministic
     instead of depending on two writes happening to land in the same second.
     """
-    TARGET.write_text(original.replace(old, new))
+    target = work / TARGET_REL
+    pycache = target.parent / "__pycache__"
+    target.write_text(original.replace(old, new))
     if pin_mtime:
-        os.utime(TARGET, (pin_mtime, pin_mtime))
-    shutil.rmtree(PYCACHE, ignore_errors=True)
+        os.utime(target, (pin_mtime, pin_mtime))
+    shutil.rmtree(pycache, ignore_errors=True)
     result = subprocess.run(
         [str(PYTEST), "-q", "-x", pytest_target],
-        cwd=ROOT,
+        cwd=work,
         capture_output=True,
         text=True,
-        env=MUTANT_ENV,
+        env={**MUTANT_ENV, "PYTHONPATH": str(work / "src")},
     )
-    if PYCACHE.exists():
+    if pycache.exists():
         raise RuntimeError(
             "bytecode cache reappeared during a mutant run: results are not "
             "trustworthy (PYTHONDONTWRITEBYTECODE had no effect)"
@@ -222,22 +277,21 @@ def run_mutant(
     return result.returncode
 
 
+def _assert_untouched(original: str) -> None:
+    if (ROOT / TARGET_REL).read_text() != original:
+        raise RuntimeError("working-tree source changed during a mutation run")
+
+
 def negative_control() -> int:
     """Prove the harness can still tell a killer from an equivalent mutant."""
-    original = TARGET.read_text()
-    try:
-        pinned = 1_600_000_000.0  # identical mtime for both, see run_mutant
+    original = (ROOT / TARGET_REL).read_text()
+    pinned = 1_600_000_000.0  # identical mtime for both, see run_mutant
+    with sandbox() as work:
         codes = [
-            run_mutant(original, old, new, "tests", pin_mtime=pinned)
+            run_mutant(work, original, old, new, "tests", pin_mtime=pinned)
             for _, old, new in CONTROL
         ]
-    finally:
-        TARGET.write_text(original)
-        # The control pins an mtime and leaves cache state behind; neither may
-        # leak into the real mutation run that follows.
-        shutil.rmtree(PYCACHE, ignore_errors=True)
-    if TARGET.read_text() != original:
-        raise RuntimeError("negative control did not restore the source file")
+    _assert_untouched(original)
     ok = codes == [1, 0]
     for (name, _, _), code in zip(CONTROL, codes, strict=True):
         verdict = {1: "KILLED", 0: "SURVIVED"}.get(code, f"ERROR (exit {code})")
@@ -250,13 +304,13 @@ def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "--negative-control":
         return negative_control()
     pytest_target = sys.argv[1] if len(sys.argv) > 1 else "tests"
-    original = TARGET.read_text()
+    original = (ROOT / TARGET_REL).read_text()
     killed = 0
     errors = 0
-    try:
+    with sandbox() as work:
         for name, old, new in MUTANTS:
             assert original.count(old) == 1, f"{name}: pattern not unique"
-            returncode = run_mutant(original, old, new, pytest_target)
+            returncode = run_mutant(work, original, old, new, pytest_target)
             # Only exit code 1 (tests ran and at least one failed) is a kill.
             # 0 = survived; anything else (collection error, usage error, no
             # tests collected) means nothing was verified — never count it.
@@ -269,8 +323,7 @@ def main() -> int:
                 status = f"ERROR (pytest exit {returncode}, no tests verified)"
                 errors += 1
             print(f"{name}: {status}")
-    finally:
-        TARGET.write_text(original)
+    _assert_untouched(original)
     summary = f"\n{killed}/{len(MUTANTS)} mutants killed"
     if errors:
         summary += f", {errors} ERROR — run is invalid"

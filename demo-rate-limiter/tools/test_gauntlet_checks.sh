@@ -44,6 +44,22 @@ expect 0 $? "clean tree passes"
 must_not_match 'forbidden' "$work/tree/no-such-path" >/dev/null 2>&1
 expect 2 $? "broken scan fails closed"
 
+# 4. A hit reports where, never what: the matching line may be a credential,
+#    and the scan's output lands in CI logs. Covers a single-file argument
+#    too, where grep would otherwise omit the filename and cut would print
+#    the start of the line instead.
+printf 'FORBIDDEN=hunter2-canary\n' > "$work/tree/leak.txt"
+for target in "$work/tree" "$work/tree/leak.txt"; do
+  out=$(must_not_match 'forbidden' "$target" 2>&1)
+  rc=$?
+  case $out in
+    *hunter2-canary*) expect 1 9 "hit output withholds the matching text ($target)" ;;
+    *leak.txt:1*) expect 1 "$rc" "hit output names file:line only ($target)" ;;
+    *) expect 1 9 "hit output names file:line ($target)" ;;
+  esac
+done
+rm "$work/tree/leak.txt"
+
 if [ "$failures" -ne 0 ]; then
   echo "FAIL: $failures fail-closed expectation(s) violated"
   exit 1
