@@ -130,8 +130,11 @@ def _manifest_without_git(root: Path) -> list[str]:
 
 
 def _read_input(path: Path) -> bytes:
+    # Hashing the link text (what Git stores) would let the target change
+    # under an unchanged binding, and following it could reach outside the
+    # scope. No source input needs to be a link, so refuse it.
     if path.is_symlink():
-        return os.fsencode(os.readlink(path))
+        raise RuntimeError(f"source input is a symlink: {path}")
     if not path.is_file():
         raise RuntimeError(f"source input is not a regular file: {path}")
     try:

@@ -160,6 +160,27 @@ def test_no_git_empty_scope_fails_closed(tmp_path: Path) -> None:
     _assert_failed_closed(_run_state(archive), "source scope has no input")
 
 
+def test_committed_symlink_input_fails_closed(tmp_path: Path) -> None:
+    """A link's target can change while the link text, and Git, stay clean."""
+    repo = _fixture_repo(tmp_path)
+    outside = tmp_path / "outside.py"
+    outside.write_text("VALUE = 1\n")
+    (repo / "demo-rate-limiter/src/ratelimiter/linked.py").symlink_to(outside)
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "add link")
+
+    _assert_failed_closed(_run_state(repo), "symlink")
+
+
+def test_no_git_symlink_input_fails_closed(tmp_path: Path) -> None:
+    archive = _archive(_fixture_repo(tmp_path), tmp_path / "archive")
+    outside = tmp_path / "outside.py"
+    outside.write_text("VALUE = 1\n")
+    (archive / "demo-rate-limiter/src/ratelimiter/linked.py").symlink_to(outside)
+
+    _assert_failed_closed(_run_state(archive), "symlink")
+
+
 def test_shallow_history_withholds_provenance(tmp_path: Path) -> None:
     """A truncated history must degrade the provenance, not invent one.
 

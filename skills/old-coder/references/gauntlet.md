@@ -16,13 +16,20 @@ Makefile / CI config first). These are the defaults when nothing exists.
 
 ## JavaScript / TypeScript
 
+Run only locally installed binaries: `npx --no-install` (npm 7+ reads it as
+`--no`) fails when the tool is missing instead of fetching it. Bare `npx`
+auto-confirms the download when stdin is not a TTY or CI is detected, which
+runs an unpinned version no SPEC approved — and bare `npx tsc` without
+`typescript` installed fetches the unrelated `tsc` package. Install the
+approved, pinned dev dependencies first.
+
 | Layer | Tool | Command |
 |---|---|---|
-| Tests | vitest / jest | `npx vitest run` / `npx jest` |
-| Types | tsc | `npx tsc --noEmit` |
-| Lint | eslint | `npx eslint .` |
-| Changed-line coverage | vitest/jest coverage | `npx vitest run --coverage` (v8, per-file report); check touched files |
-| Mutation | Stryker | `npx stryker run` (scope with `mutate: [<changed files>]` — full-project runs are slow) |
+| Tests | vitest / jest | `npx --no-install vitest run` / `npx --no-install jest` |
+| Types | tsc | `npx --no-install tsc --noEmit` |
+| Lint | eslint | `npx --no-install eslint .` |
+| Changed-line coverage | vitest/jest coverage | `npx --no-install vitest run --coverage` (v8, per-file report); check touched files |
+| Mutation | Stryker | `npx --no-install stryker run` (scope with `mutate: [<changed files>]` — full-project runs are slow) |
 | Property-based | fast-check | `fc.assert(fc.property(...))` |
 
 ## Go
@@ -138,9 +145,13 @@ check that aborts the run); any runner written from this procedure needs the
 equivalent, and EVIDENCE should say which check proves execution.
 
 Script this rather than hand-editing, and **persist the script in the repo**
-(e.g. `tools/mutants.py`): it holds the original source, applies each mutant by
-unique string replacement, runs the suite, and restores. Hand-editing N times
-invites restore mistakes, and the EVIDENCE rule (all numbers from one final
+(e.g. `tools/mutants.py`): it copies the tree to a temp directory, applies
+each mutant there by unique string replacement, and runs the suite against the
+copy. Never mutate the working tree and rely on restoring it: a `finally` does
+not run on SIGTERM or SIGKILL, and a surviving mutant left behind passes the
+suite. Check that the copy is what actually gets imported — an editable
+install points back at the original source. Hand-editing N times invites
+restore mistakes, and the EVIDENCE rule (all numbers from one final
 fresh run) means you will run the mutants at least twice — a persisted script
 makes the rerun free, the mutant list auditable, and the reported score
 re-runnable by the human, which a scratch-directory script is not.
@@ -156,8 +167,8 @@ re-runnable by the human, which a scratch-directory script is not.
 3. Run the test suite after each mutant. **Every mutant must make at least one
    test fail.** A surviving mutant means a missing or vacuous assertion — add
    the test that kills it, then continue.
-4. Restore the original code (verify with `git diff` that only intended changes
-   remain) and run the suite once more to confirm green.
+4. Confirm with `git diff` that the working tree holds only intended changes,
+   and run the suite once more to confirm green.
 5. Report as: "manual mutation: N/N killed".
 
 ## Gauntlet entry point
