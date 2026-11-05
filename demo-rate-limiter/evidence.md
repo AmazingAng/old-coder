@@ -1,24 +1,25 @@
 # Evidence Report — Sliding-Window Rate Limiter (Tier 3)
 
 - Spec approval: **obtained** for REVISION 4 (2026-08-09) and REVISION 5–7
-  (2026-08-18) — the human approved each contract change before implementation.
+  (2026-08-18) and REVISION 8 (2026-11-05) — the human approved each contract
+  change before implementation.
   Earlier revisions (2026-07-25, 2026-07-27) were autonomous and are still
   unapproved; treat them as the weaker part of the spec.
 - Independent verification: **not performed against the final source state
-  `42528d9`.** Six earlier rounds were performed; the last verified state
+  `4c184cb`.** Six earlier rounds were performed; the last verified state
   `d0b506c` returned `failed`, and the fixes made since — one of them
   behavioural — are disclosed below as unverified. This report is finalized as
   a **declared downgrade**, not on the strength of a passing verdict. A
   verdict attaches to the state a verifier actually saw, and no verifier has
   seen this one.
-- Source state: source commit `42528d9`; sha256 tree hash
-  `5aa96ec5487c957c` — reproduce both with `./tools/source_state.sh` from any
+- Source state: source commit `4c184cb`; sha256 tree hash
+  `48000fb38edb5064` — reproduce both with `./tools/source_state.sh` from any
   directory. When a binding is produced the tree hash is the required content
   identity; the source commit is provenance and is supplied only where
   complete history is available, so a shallow checkout reports
   `(unavailable: shallow history)` and a no-Git archive reports `(no git)`,
   both alongside this same tree hash. No error path emits a binding at all.
-  The script separately reports current HEAD; commits after `42528d9` that
+  The script separately reports current HEAD; commits after `4c184cb` that
   touch only this report or other out-of-scope paths preserve the source
   commit and tree hash. The manifest includes `.github/workflows`, which
   decides whether the gauntlet runs in CI at all.
@@ -27,14 +28,15 @@
 - Entry point: `./tools/gauntlet.sh` reruns every layer below.
 
 All numbers are from one final fresh run of the entry point, executed
-2026-08-18 at source commit `42528d9` after the last code edit.
+2026-11-05 at source commit `4c184cb` after the last code edit.
 
 `spec.md` was deliberately pruned back to a contract before REVISION 5
 (339 → 255 lines). Every clause, invariant, obligation and failure-model row
 survived; what was removed is the per-revision forensics, which lives in the
 honest notes below and in git. REVISION 5–7 add the approved source-binding,
 provenance and gauntlet-orchestration contracts without changing rate-limiter
-behaviour.
+behaviour. REVISION 8 hardens three evidence tools after a security audit,
+again without touching rate-limiter behaviour.
 
 ## Spec → Test mapping
 
@@ -73,6 +75,7 @@ Status legend: pass / fail / unverified / n-a.
 | REVISION 5: source binding is reproducible and fail-closed | test_source_state.py (ignored artifacts, staged/unstaged/untracked/deleted inputs, clean clone, no-Git archive, arbitrary cwd, evidence-only commit) | pass |
 | REVISION 6: truncated history withholds provenance, never invents it | test_source_state.py::test_shallow_history_withholds_provenance (exact marker, shallow HEAD, tree equal to the full clone, empty stderr) | pass |
 | REVISION 6: covered error scenarios pin their reason and emit no binding | test_source_state.py (Git dirty, Git deletion, Git untracked, no-Git missing input, no-Git empty scope — each asserts the reason and `stdout == ""`) | pass |
+| REVISION 8: mutants never touch the working tree; scan hits never echo content; scope symlinks fail closed | `mutants.py` sandbox import check + byte-for-byte working-tree check; test_gauntlet_checks.sh scenario 4 (directory and single-file targets); test_source_state.py::test_committed_symlink_input_fails_closed, ::test_no_git_symlink_input_fails_closed | pass |
 | REVISION 7: omitted or failed gauntlet work cannot report green | test_gauntlet_orchestration.sh (omitted layer, failing command with exact rc and stopped sentinel, unknown layer, duplicate layer, complete-manifest positive control) | pass |
 
 ## Gauntlet (final fresh run: `./tools/gauntlet.sh`)
@@ -80,21 +83,21 @@ Status legend: pass / fail / unverified / n-a.
 | Layer | Command | Result |
 |---|---|---|
 | Orchestration self-test | `sh tools/test_gauntlet_orchestration.sh` (omitted layer, command failure, unknown layer, duplicate layer, and complete-manifest positive control against the real helper) | 5/5 scenarios, 13/13 expectations ok |
-| Checker self-test | `sh tools/test_gauntlet_checks.sh` (asserts the must-not scan fails on a planted pattern, passes on a clean tree, and fails closed with a distinct rc 2 when the scan itself breaks) | 3/3 expectations ok |
-| Source-state self-test | `pytest -q tests/test_source_state.py` (negative controls for the covered fail-closed scenarios; shallow/full-history, clean clone and no-Git archive comparisons) | 9/9 passed |
+| Checker self-test | `sh tools/test_gauntlet_checks.sh` (asserts the must-not scan fails on a planted pattern, passes on a clean tree, and fails closed with a distinct rc 2 when the scan itself breaks, and that a hit prints `file:line` without the matching text) | 5/5 expectations ok |
+| Source-state self-test | `pytest -q tests/test_source_state.py` (negative controls for the covered fail-closed scenarios; shallow/full-history, clean clone and no-Git archive comparisons; Git and no-Git symlink refusal) | 11/11 passed |
 | Mutation harness negative control | `python tools/mutants.py --negative-control` (a killer and a strictly-equivalent mutant of identical size under one pinned mtime) | C1 KILLED, C2 SURVIVED — ok |
-| Tests | `pytest -q --cov=ratelimiter` | 50 passed, 0 failed |
+| Tests | `pytest -q --cov=ratelimiter` | 52 passed, 0 failed |
 | Types | `mypy src tests examples tools` (strict) | 0 errors in 8 files |
 | Lint + format + complexity | `ruff check . && ruff format --check .` (mccabe ≤ 8) | 0 warnings, 10 files formatted |
 | Changed-line coverage | `pytest --cov … --cov-fail-under=100` | 49/49 statements, 20/20 branches (100%). **This layer is a gate**; before 2026-08-09 it printed a percentage and exited 0 no matter how far coverage fell |
-| Mutation | `python tools/mutants.py` (manual, scripted; only pytest exit 1 counts as a kill; `__pycache__` cleared and `PYTHONDONTWRITEBYTECODE` set per mutant) | 22/22 killed |
+| Mutation | `python tools/mutants.py` (manual, scripted, in a throwaway copy whose package is verified to be the one imported; only pytest exit 1 counts as a kill; `__pycache__` cleared and `PYTHONDONTWRITEBYTECODE` set per mutant) | 22/22 killed; working-tree source unchanged |
 | Property-based | hypothesis, 2 properties | 100 examples each, 0 falsified |
 | Real execution | `python examples/demo.py` (real `time.monotonic`) | burst of 5 → `[True, True, True, False, False]`; other key unaffected; allowed again after window |
 | Supply chain | `pip-audit -r requirements-dev.txt` | no known vulnerabilities; runtime dependencies: **none** (stdlib only; `threading` is stdlib) |
-| Secret scan | must-not scan in `tools/gauntlet.sh` over src, tests, tools, examples, spec.md, pyproject.toml, requirements-dev.txt and `../.github` | clean, no matches |
-| Source binding | `tools/source_state.sh` (last gauntlet layer) | source commit `42528d9`; tree `5aa96ec5487c957c`; current HEAD is reported separately |
+| Secret scan | must-not scan in `tools/gauntlet.sh` over src, tests, tools, examples, spec.md, pyproject.toml, requirements-dev.txt and `../.github`; hits print `file:line` only | clean, no matches |
+| Source binding | `tools/source_state.sh` (last gauntlet layer) | source commit `4c184cb`; tree `48000fb38edb5064`; current HEAD is reported separately |
 | License check | — | n-a: zero runtime dependencies, nothing redistributed beyond this repo's own MIT code |
-| Suite health | pytest-randomly (order shuffled every run) | 50 passed in randomized order, 10/10 consecutive runs |
+| Suite health | pytest-randomly (order shuffled every run) | 52 passed in randomized order, 10/10 consecutive runs |
 
 ## Layer attribution
 
@@ -167,9 +170,21 @@ independently verified**:
 - REVISION 6 and the shallow-history provenance repair in commits `3e45e16`
   and `49e8762`, plus the historical CI wording correction in `4734451`;
 - REVISION 7 and the fail-closed gauntlet orchestration in commits `5b8dc1b`
-  and `42528d9`.
+  and `42528d9`;
+- REVISION 8 and the audit hardening of the evidence tooling in commit
+  `4c184cb`.
 
 ## Honest notes
+
+- **REVISION 8 came from an external audit, not from the gauntlet.** All three
+  tooling defects were invisible to it: the in-place mutation runner was only
+  unsafe when killed, the scan was only leaky when it failed, and no symlink
+  exists in the source scope. One sharpening came from fixing them — the
+  must-not scan flagged the new comment that explains it, and printed only
+  `tools/must_not_match.sh:6`. The `-H` flag guards GNU grep omitting the
+  filename for a single-file target; macOS grep already prints it under `-r`,
+  so the local control cannot tell `-H` from its absence and only CI on Linux
+  exercises that branch.
 
 - **The gauntlet previously authenticated headings, not completed work.** The
   issue investigation removed the committed mutation invocation while keeping
