@@ -110,10 +110,20 @@ def _is_generated(relative: Path) -> bool:
     )
 
 
+def _reject_symlink_path(root: Path, path: Path) -> None:
+    """Check every component before following a scope or reading its input."""
+    current = root
+    for part in path.relative_to(root).parts:
+        current = current / part
+        if current.is_symlink():
+            raise RuntimeError(f"source input is a symlink: {current}")
+
+
 def _manifest_without_git(root: Path) -> list[str]:
     files: list[str] = []
     for scope in SCOPES:
         candidate = root / scope
+        _reject_symlink_path(root, candidate)
         if not candidate.exists():
             raise RuntimeError(f"source input is missing: {scope}")
         inputs = [candidate] if candidate.is_file() else candidate.rglob("*")
@@ -147,6 +157,7 @@ def _tree_hash(root: Path, files: list[str]) -> str:
     digest = hashlib.sha256()
     for relative in files:
         path_bytes = relative.encode("utf-8")
+        _reject_symlink_path(root, root / relative)
         content = _read_input(root / relative)
         digest.update(len(path_bytes).to_bytes(8, "big"))
         digest.update(path_bytes)
@@ -159,6 +170,8 @@ def main() -> int:
     try:
         git_root = _git_root()
         root = git_root or ROOT
+        for scope in SCOPES:
+            _reject_symlink_path(root, root / scope)
         if git_root:
             head_before = os.fsdecode(
                 _git(root, "rev-parse", "--short", "HEAD").stdout

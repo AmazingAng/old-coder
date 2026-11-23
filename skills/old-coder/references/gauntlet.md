@@ -16,20 +16,22 @@ Makefile / CI config first). These are the defaults when nothing exists.
 
 ## JavaScript / TypeScript
 
-Run only locally installed binaries: `npx --no-install` (npm 7+ reads it as
-`--no`) fails when the tool is missing instead of fetching it. Bare `npx`
-auto-confirms the download when stdin is not a TTY or CI is detected, which
-runs an unpinned version no SPEC approved — and bare `npx tsc` without
-`typescript` installed fetches the unrelated `tsc` package. Install the
-approved, pinned dev dependencies first.
+Install the approved, pinned dev dependencies first, then run the explicit
+project-local binary paths below from that project's root. Missing local
+tools must fail: never fall back to npx, global tools, an ancestor project's
+dependencies or the npm cache. `npx --no-install` prevents installation but
+can still run a global or cached tool outside the approved dependency set.
+The TypeScript compiler comes from `typescript`; Stryker's CLI comes from
+`@stryker-mutator/core`. For workspaces, use the explicit approved workspace
+tool path instead of relying on executable lookup.
 
 | Layer | Tool | Command |
 |---|---|---|
-| Tests | vitest / jest | `npx --no-install vitest run` / `npx --no-install jest` |
-| Types | tsc | `npx --no-install tsc --noEmit` |
-| Lint | eslint | `npx --no-install eslint .` |
-| Changed-line coverage | vitest/jest coverage | `npx --no-install vitest run --coverage` (v8, per-file report); check touched files |
-| Mutation | Stryker | `npx --no-install stryker run` (scope with `mutate: [<changed files>]` — full-project runs are slow) |
+| Tests | vitest / jest | `./node_modules/.bin/vitest run` / `./node_modules/.bin/jest` |
+| Types | tsc | `./node_modules/.bin/tsc --noEmit` |
+| Lint | eslint | `./node_modules/.bin/eslint .` |
+| Changed-line coverage | vitest/jest coverage | `./node_modules/.bin/vitest run --coverage` (v8, per-file report); check touched files |
+| Mutation | Stryker | `./node_modules/.bin/stryker run` (scope with `mutate: [<changed files>]` — full-project runs are slow) |
 | Property-based | fast-check | `fc.assert(fc.property(...))` |
 
 ## Go
@@ -149,8 +151,13 @@ Script this rather than hand-editing, and **persist the script in the repo**
 each mutant there by unique string replacement, and runs the suite against the
 copy. Never mutate the working tree and rely on restoring it: a `finally` does
 not run on SIGTERM or SIGKILL, and a surviving mutant left behind passes the
-suite. Check that the copy is what actually gets imported — an editable
-install points back at the original source. Hand-editing N times invites
+suite. Reject file, directory and dangling symlinks in the copy before any
+import, and recheck the mutation target before each write; preserving a link
+can redirect writes outside the copy. Check that the copy is what actually
+gets imported — an editable install points back at the original source.
+The copy protects files from accidental mutation, not from hostile test code
+or concurrent filesystem replacement; use an OS sandbox for those threats.
+Hand-editing N times invites
 restore mistakes, and the EVIDENCE rule (all numbers from one final
 fresh run) means you will run the mutants at least twice — a persisted script
 makes the rerun free, the mutant list auditable, and the reported score

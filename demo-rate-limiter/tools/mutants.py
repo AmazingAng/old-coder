@@ -46,6 +46,31 @@ SANDBOX_IGNORE = shutil.ignore_patterns(
 MUTANT_ENV = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
 
 
+def _walk_error(error: OSError) -> None:
+    raise error
+
+
+def _reject_symlinks(work: Path) -> None:
+    """Inspect links without following them, including directory/dangling links."""
+    for directory, directories, files in os.walk(work, onerror=_walk_error):
+        for name in directories + files:
+            path = Path(directory) / name
+            if path.is_symlink():
+                raise RuntimeError(f"mutation copy contains a symlink: {path}")
+
+
+def _sandbox_target(work: Path) -> Path:
+    target = work / TARGET_REL
+    path = work
+    for part in TARGET_REL.parts:
+        path = path / part
+        if path.is_symlink():
+            raise RuntimeError(f"mutation target contains a symlink: {path}")
+    if not target.resolve(strict=True).is_relative_to(work.resolve(strict=True)):
+        raise RuntimeError("mutation target escapes the disposable copy")
+    return target
+
+
 @contextmanager
 def sandbox() -> Iterator[Path]:
     """Copy the demo to a temp dir and prove its package is what gets imported.
@@ -57,6 +82,10 @@ def sandbox() -> Iterator[Path]:
     with tempfile.TemporaryDirectory(prefix="mutants-") as tmp:
         work = Path(tmp) / "demo"
         shutil.copytree(ROOT, work, ignore=SANDBOX_IGNORE, symlinks=True)
+        # Preserve links only long enough to reject them, never dereference
+        # them during copying or import. This is not an OS execution sandbox.
+        _reject_symlinks(work)
+        target = _sandbox_target(work)
         env = {**MUTANT_ENV, "PYTHONPATH": str(work / "src")}
         imported = subprocess.run(
             [str(PYTHON), "-c", "import ratelimiter; print(ratelimiter.__file__)"],
@@ -66,7 +95,7 @@ def sandbox() -> Iterator[Path]:
             env=env,
             check=True,
         ).stdout.strip()
-        if Path(imported).resolve() != (work / TARGET_REL).resolve():
+        if Path(imported).resolve() != target.resolve():
             raise RuntimeError(
                 f"sandbox is not what gets imported: {imported} — mutants "
                 "would run against the working tree"
@@ -256,7 +285,7 @@ def run_mutant(
     mutants to one mtime makes the (mtime, size) collision deterministic
     instead of depending on two writes happening to land in the same second.
     """
-    target = work / TARGET_REL
+    target = _sandbox_target(work)
     pycache = target.parent / "__pycache__"
     target.write_text(original.replace(old, new))
     if pin_mtime:

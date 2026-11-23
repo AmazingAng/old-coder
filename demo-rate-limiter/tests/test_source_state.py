@@ -6,6 +6,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 TOOLS = Path(__file__).resolve().parents[1] / "tools"
 
 
@@ -177,6 +179,33 @@ def test_no_git_symlink_input_fails_closed(tmp_path: Path) -> None:
     outside = tmp_path / "outside.py"
     outside.write_text("VALUE = 1\n")
     (archive / "demo-rate-limiter/src/ratelimiter/linked.py").symlink_to(outside)
+
+    _assert_failed_closed(_run_state(archive), "symlink")
+
+
+@pytest.mark.parametrize("git_mode", [True, False])
+@pytest.mark.parametrize("relative", ["demo-rate-limiter/src", ".github"])
+def test_scope_directory_links_fail_closed(
+    tmp_path: Path, git_mode: bool, relative: str
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    root = repo if git_mode else _archive(repo, tmp_path / "archive")
+    target = root / relative
+    outside = tmp_path / "outside-directory"
+    target.rename(outside)
+    target.symlink_to(outside, target_is_directory=True)
+    if git_mode:
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-qm", "link source directory")
+
+    _assert_failed_closed(_run_state(root), "symlink")
+
+
+def test_dangling_scope_directory_link_fails_closed(tmp_path: Path) -> None:
+    archive = _archive(_fixture_repo(tmp_path), tmp_path / "archive")
+    target = archive / "demo-rate-limiter/src"
+    shutil.rmtree(target)
+    target.symlink_to(tmp_path / "missing", target_is_directory=True)
 
     _assert_failed_closed(_run_state(archive), "symlink")
 
