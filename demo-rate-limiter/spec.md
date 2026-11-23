@@ -440,6 +440,44 @@ runtime behaviour or its public API.
   evidence rebinding third. Independent verification remains `not performed`
   unless a separate verifier inspects the final state.
 
+## REVISION 9 — close the audit follow-up gaps (Tier 3)
+
+2026-11-24: the user authorized fixing the three PR #18 review findings and
+merging after a clean review. This setup plan records that repair scope; it
+has not received a separate document-approval exchange.
+
+### Behaviour and failure model
+
+- A mutation copy must reject file, directory and dangling symlinks before
+  importing the subject or writing any mutant. Recheck the target path before
+  each write so a link introduced between runs cannot redirect the next one.
+  Rejection must leave every external target byte-for-byte unchanged.
+- Source binding must reject links at a scope root and in its ancestors as
+  well as leaf inputs, in both Git and no-Git modes. It must report `symlink`
+  and emit no binding. Ordinary directories still produce the same binding
+  from a clean checkout and its archive.
+- JS guidance must call explicit project-local binaries. A missing local
+  tool must fail even when a same-named global executable is available;
+  no npx, global, ancestor-project or cache fallback is authorized.
+- These checks cover filesystem links present at inspection, not a hostile
+  concurrent process replacing files between checks. The mutation copy is
+  not an OS sandbox for untrusted test code.
+
+### Setup and acceptance
+
+- Continue the existing PR branch `fix/codex-security-audit` to reuse its
+  installed toolchain. Preserve the unrelated untracked assets. No new deps.
+- Extend `tests/test_source_state.py`; add
+  `tools/test_mutation_isolation.py` and run it in the existing checker layer
+  of `tools/gauntlet.sh`, outside the subject's mutation-test suite.
+- Repair `tools/mutants.py`, `tools/source_state.py` and the skill's
+  `references/gauntlet.md`; update `evidence.md` after the final gauntlet.
+- Observe the new regression controls fail before implementation, then pass;
+  run the full gauntlet, inspect the final diff and Linux CI before merging.
+  Persist source changes in a commit so source binding can verify a clean
+  tree; record evidence in a following commit. Independent verification stays
+  `not performed` unless the fresh-context protocol is actually executed.
+
 ## Revision history
 
 Revisions 1–3 (2026-07-25 → 07-27) were made autonomously during the original
