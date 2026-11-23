@@ -391,6 +391,93 @@ reported success.
   implementation second; evidence rebinding third. Independent verification
   remains `not performed` unless a separate verifier inspects the final state.
 
+## REVISION 8 — audit hardening of the evidence tooling (Tier 3)
+
+Approved 2026-11-05. A security audit of the skill and demo found three
+tooling defects; this revision repairs them. It does not change rate-limiter
+runtime behaviour or its public API.
+
+- `tools/mutants.py` wrote each mutant into the working tree and relied on a
+  `finally` to restore it. SIGTERM skips the `finally`, so an interrupted run
+  left a deliberately broken `src/` behind (reproduced).
+- `must_not_match` printed every matching line. On the credential scan that
+  copies the credential itself into CI logs and chat (reproduced with a fake
+  credential).
+- `source_state.py` hashed a symlink's link text, so the target could change
+  under an unchanged binding (reproduced: `VALUE = 1` → `999`, same output).
+
+### Behaviour
+
+- Mutation runs, including the negative control, mutate a throwaway copy of
+  the demo. The run aborts unless the copy's package is the one imported (the
+  venv's editable install points at the real `src/`). The working-tree source
+  is checked byte-for-byte unchanged afterwards.
+- A must-not scan hit prints `file:line` only, never the matching text; exit
+  codes are unchanged (0 clean, 1 hit, 2 scan broke).
+- A symlink anywhere in the source scope makes `tools/source_state.sh` fail
+  closed with the reason `symlink`, in Git and no-Git modes, emitting no
+  binding.
+
+### Must NOT do
+
+- Do not protect user files by restoring them on exit.
+- Do not echo matched content from a must-not scan.
+- Do not follow a source-scope symlink to hash its target; refuse it.
+- Do not add a runtime or development dependency for this repair.
+
+### Setup plan
+
+- Work on branch `fix/codex-security-audit`, preserving unrelated untracked
+  assets in the user's checkout.
+- Modify `tools/mutants.py`, `tools/must_not_match.sh` and
+  `tools/source_state.py`; extend `tools/test_gauntlet_checks.sh` (hit output
+  withholds the matching text, directory and single-file targets) and
+  `tests/test_source_state.py` (committed symlink and no-Git symlink
+  controls). Each new control was run against the pre-fix code and fails
+  there. The audit's fourth finding — bare `npx` in the JS tooling table —
+  is a skill-doc fix in `references/gauntlet.md` with no demo surface.
+- Commit cadence: this approved SPEC first; tests plus implementation second;
+  evidence rebinding third. Independent verification remains `not performed`
+  unless a separate verifier inspects the final state.
+
+## REVISION 9 — close the audit follow-up gaps (Tier 3)
+
+2026-11-24: the user authorized fixing the three PR #18 review findings and
+merging after a clean review. This setup plan records that repair scope; it
+has not received a separate document-approval exchange.
+
+### Behaviour and failure model
+
+- A mutation copy must reject file, directory and dangling symlinks before
+  importing the subject or writing any mutant. Recheck the target path before
+  each write so a link introduced between runs cannot redirect the next one.
+  Rejection must leave every external target byte-for-byte unchanged.
+- Source binding must reject links at a scope root and in its ancestors as
+  well as leaf inputs, in both Git and no-Git modes. It must report `symlink`
+  and emit no binding. Ordinary directories still produce the same binding
+  from a clean checkout and its archive.
+- JS guidance must call explicit project-local binaries. A missing local
+  tool must fail even when a same-named global executable is available;
+  no npx, global, ancestor-project or cache fallback is authorized.
+- These checks cover filesystem links present at inspection, not a hostile
+  concurrent process replacing files between checks. The mutation copy is
+  not an OS sandbox for untrusted test code.
+
+### Setup and acceptance
+
+- Continue the existing PR branch `fix/codex-security-audit` to reuse its
+  installed toolchain. Preserve the unrelated untracked assets. No new deps.
+- Extend `tests/test_source_state.py`; add
+  `tools/test_mutation_isolation.py` and run it in the existing checker layer
+  of `tools/gauntlet.sh`, outside the subject's mutation-test suite.
+- Repair `tools/mutants.py`, `tools/source_state.py` and the skill's
+  `references/gauntlet.md`; update `evidence.md` after the final gauntlet.
+- Observe the new regression controls fail before implementation, then pass;
+  run the full gauntlet, inspect the final diff and Linux CI before merging.
+  Persist source changes in a commit so source binding can verify a clean
+  tree; record evidence in a following commit. Independent verification stays
+  `not performed` unless the fresh-context protocol is actually executed.
+
 ## Revision history
 
 Revisions 1–3 (2026-07-25 → 07-27) were made autonomously during the original

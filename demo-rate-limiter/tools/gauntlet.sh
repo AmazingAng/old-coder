@@ -13,7 +13,11 @@ PY=.venv/bin
 
 run_layer orchestration-self-test sh tools/test_gauntlet_orchestration.sh
 
-run_layer checker-self-test sh tools/test_gauntlet_checks.sh
+layer_checker_self_test() {
+  sh tools/test_gauntlet_checks.sh || return $?
+  "$PY/pytest" -q tools/test_mutation_isolation.py || return $?
+}
+run_layer checker-self-test layer_checker_self_test
 
 run_layer source-state-self-test "$PY/pytest" -q tests/test_source_state.py
 
